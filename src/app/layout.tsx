@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "💘 소캐팅 사전조사",
-  description: "QR 소개팅 사전 접수 폼",
+  title: "QRious - QR 소개팅 사전조사",
+  description: "소개팅 사전 접수 폼",
 };
 
 export default function RootLayout({
