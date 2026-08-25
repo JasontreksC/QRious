@@ -22,7 +22,7 @@ async function parseError(res: Response): Promise<ApiError> {
   }
 }
 
-/** Same-origin calls; Next.js proxies to API_BASE_URL on the server. */
+/** Same-origin calls to Next.js Route Handlers (Neon on the server). */
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, {
     ...init,
