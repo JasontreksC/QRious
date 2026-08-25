@@ -34,10 +34,10 @@ export async function GET(req: NextRequest) {
       { header: '성별', key: 'gender', width: 8 },
       { header: '나이', key: 'age', width: 8 },
       { header: 'MBTI', key: 'mbti', width: 10 },
-      { header: 'have', key: 'have', width: 40 },
-      { header: 'want', key: 'want', width: 40 },
-      { header: 'ex_have', key: 'ex_have', width: 40 },
-      { header: 'ex_want', key: 'ex_want', width: 40 },
+      { header: '매력', key: 'have', width: 40 },
+      { header: '이상형', key: 'want', width: 40 },
+      { header: '기타 매력', key: 'ex_have', width: 40 },
+      { header: '기타 이상형', key: 'ex_want', width: 40 },
     ];
 
     sheet.getRow(1).font = { bold: true };
