@@ -135,3 +135,32 @@ export async function deleteCharm(charmId: string): Promise<void> {
     method: 'DELETE',
   });
 }
+
+export async function deleteAdminStudent(studentId: string): Promise<void> {
+  await request<{ ok: boolean }>(`/api/admin/students/${studentId}`, {
+    method: 'DELETE',
+  });
+}
+
+export async function downloadAdminStudentsXlsx(query = ''): Promise<void> {
+  const params = query.trim()
+    ? `?q=${encodeURIComponent(query.trim())}`
+    : '';
+  const res = await fetch(`/api/admin/students/export${params}`, {
+    headers: { Accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' },
+  });
+  if (!res.ok) {
+    throw await parseError(res);
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  const header = res.headers.get('Content-Disposition') ?? '';
+  const matched = header.match(/filename="([^"]+)"/);
+  anchor.href = url;
+  anchor.download = matched?.[1] ?? 'qrious-students.xlsx';
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}

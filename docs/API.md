@@ -151,6 +151,8 @@ httpOnly 쿠키 `qrious_admin`으로 인증합니다. 비밀번호는 `ADMIN_PAS
 | POST | `/api/admin/logout` | 쿠키 삭제 |
 | GET | `/api/admin/session` | `{ "authenticated": true }` |
 | GET | `/api/admin/students` | 참가자 + have/want/ex_have/ex_want |
+| GET | `/api/admin/students/export` | 조인된 참가자 xlsx (`?q=` 이름/학번 검색) |
+| DELETE | `/api/admin/students/{studentId}` | 참가자 삭제 (have/want/ex CASCADE) |
 | POST | `/api/admin/charms` | `{ "name" }` 태그 추가 |
 | DELETE | `/api/admin/charms/{charmId}` | 태그 삭제 (have/want CASCADE) |
 
