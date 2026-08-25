@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
+import Link from 'next/link';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from 'recharts';
 import {
   getCharms,
@@ -360,6 +361,12 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-[#FBF6F0] text-[#2B1B2E] font-sans pb-[calc(80px+env(safe-area-inset-bottom))]">
+      <Link
+        href="/admin"
+        className="fixed top-4 right-4 z-40 px-3 py-2 rounded-xl text-xs font-bold tracking-wide bg-white/90 border border-[#F0D9DF] text-[#8C7A8E] shadow-sm hover:bg-[#FDE8EC] hover:text-[#E8526A]"
+      >
+        관리자
+      </Link>
       <div className="max-w-[480px] mx-auto px-4 py-12">
         {/* Header */}
         <div className="text-center mb-8">

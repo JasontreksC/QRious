@@ -88,3 +88,50 @@ export async function submitSurvey(
     body: JSON.stringify(payload),
   });
 }
+
+export type AdminStudent = {
+  student_id: string;
+  name: string;
+  gender: boolean;
+  age: number | null;
+  mbti: string;
+  have: string[];
+  want: string[];
+  ex_have: string | null;
+  ex_want: string | null;
+};
+
+export async function getAdminSession(): Promise<{ authenticated: boolean }> {
+  return request<{ authenticated: boolean }>('/api/admin/session');
+}
+
+export async function adminLogin(password: string): Promise<void> {
+  await request<{ ok: boolean }>('/api/admin/login', {
+    method: 'POST',
+    body: JSON.stringify({ password }),
+  });
+}
+
+export async function adminLogout(): Promise<void> {
+  await request<{ ok: boolean }>('/api/admin/logout', { method: 'POST' });
+}
+
+export async function getAdminStudents(): Promise<AdminStudent[]> {
+  const data = await request<{ students: AdminStudent[] }>(
+    '/api/admin/students'
+  );
+  return data.students ?? [];
+}
+
+export async function createCharm(name: string): Promise<Charm> {
+  return request<Charm>('/api/admin/charms', {
+    method: 'POST',
+    body: JSON.stringify({ name }),
+  });
+}
+
+export async function deleteCharm(charmId: string): Promise<void> {
+  await request<{ ok: boolean }>(`/api/admin/charms/${charmId}`, {
+    method: 'DELETE',
+  });
+}

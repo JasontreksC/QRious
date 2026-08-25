@@ -13,10 +13,11 @@ Next.js Route Handlers가 Neon Postgres에 직접 연결합니다.
 
 ```
 DATABASE_URL=postgresql://USER:PASSWORD@ep-xxx-pooler.region.aws.neon.tech/neondb?sslmode=require
+ADMIN_PASSWORD=your-admin-password
 ```
 
 - Neon 콘솔의 **pooled** 연결 문자열을 사용합니다.
-- 브라우저 → `GET /api/charms` (Next.js) → Neon SQL
+- `ADMIN_PASSWORD`는 `/admin` 로그인과 관리자 API 쿠키 세션에 사용합니다. `NEXT_PUBLIC_`을 붙이지 마세요.
 
 ---
 
@@ -44,7 +45,8 @@ DATABASE_URL=postgresql://USER:PASSWORD@ep-xxx-pooler.region.aws.neon.tech/neond
 | 400 | `VALIDATION_ERROR` | 요청 본문 검증 실패 |
 | 409 | `DUPLICATE_STUDENT` | 동일 `student_id` 이미 존재 |
 | 500 | `INTERNAL_ERROR` | 서버/DB 오류 |
-| 503 | `CONFIG_MISSING` | `DATABASE_URL` 미설정 |
+| 503 | `CONFIG_MISSING` | `DATABASE_URL` 또는 `ADMIN_PASSWORD` 미설정 |
+| 401 | `UNAUTHORIZED` / `INVALID_PASSWORD` | 관리자 인증 실패 |
 
 ---
 
@@ -136,6 +138,23 @@ DATABASE_URL=postgresql://USER:PASSWORD@ep-xxx-pooler.region.aws.neon.tech/neond
 ```
 
 구현: [`src/app/api/surveys/route.ts`](../src/app/api/surveys/route.ts)
+
+---
+
+## 4. 관리자 API
+
+httpOnly 쿠키 `qrious_admin`으로 인증합니다. 비밀번호는 `ADMIN_PASSWORD`와 비교합니다.
+
+| 메서드 | 경로 | 설명 |
+|--------|------|------|
+| POST | `/api/admin/login` | `{ "password" }` → 세션 쿠키 |
+| POST | `/api/admin/logout` | 쿠키 삭제 |
+| GET | `/api/admin/session` | `{ "authenticated": true }` |
+| GET | `/api/admin/students` | 참가자 + have/want/ex_have/ex_want |
+| POST | `/api/admin/charms` | `{ "name" }` 태그 추가 |
+| DELETE | `/api/admin/charms/{charmId}` | 태그 삭제 (have/want CASCADE) |
+
+UI: [`src/app/admin/students/page.tsx`](../src/app/admin/students/page.tsx), [`src/app/admin/charms/page.tsx`](../src/app/admin/charms/page.tsx)
 
 ---
 
