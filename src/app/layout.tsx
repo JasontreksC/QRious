@@ -15,10 +15,6 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "QRious - QR 소개팅 사전조사",
   description: "소개팅 사전 접수 폼",
-  icons: {
-    icon: "/qr-heart.png",
-    apple: "/qr-heart.png",
-  },
 };
 
 export default function RootLayout({
