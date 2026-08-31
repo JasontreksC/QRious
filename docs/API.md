@@ -1,7 +1,7 @@
 # QRious Survey API Specification
 
 Next.js Route Handlers가 Neon Postgres에 직접 연결합니다.  
-별도 백엔드 서버는 없습니다. ERD: `student`, `charm`, `have`, `want`, `ex_have`, `ex_want`.
+별도 백엔드 서버는 없습니다. ERD: `student`, `charm`, `have`, `want`, `ex_have`, `ex_want`, `consent_notice`, `consent`.
 
 브라우저는 같은 origin의 `/api/*`만 호출하고, 서버만 `DATABASE_URL`로 Neon에 접속합니다.
 
@@ -80,6 +80,8 @@ ADMIN_PASSWORD=your-admin-password
 | `want` | 원하는 이상형 매력 | `want_charm_ids[]` |
 | `ex_have` | 추가 어필 텍스트 | `ex_have` (있을 때만) |
 | `ex_want` | 추가 이상형 텍스트 | `ex_want` (있을 때만) |
+| `consent_notice` | 버전별 동의문 원문·해시 | 제출 시 upsert (`ON CONFLICT DO NOTHING`) |
+| `consent` | 동의 증빙 (여부·시각·스냅샷) | `POST /api/surveys` |
 
 ---
 
@@ -123,6 +125,7 @@ ADMIN_PASSWORD=your-admin-password
 |------|------|------|-----|
 | `student_id` | string | O | `student.student_id` |
 | `name` | string | O | `student.name` |
+| `phone` | string | O | `student.phone` |
 | `gender` | boolean | O | `student.gender` |
 | `age` | integer | O | `student.age` |
 | `mbti` | string | O | `student.mbti` |
@@ -130,6 +133,12 @@ ADMIN_PASSWORD=your-admin-password
 | `want_charm_ids` | string[] | O | `want` |
 | `ex_have` | string \| null | X | `ex_have.charm` |
 | `ex_want` | string \| null | X | `ex_want.charm` |
+| `consent_agreed` | boolean | O | `consent.agreed` — 반드시 `true` |
+| `consent_version` | string | O | 현재 서버 동의문 버전과 일치해야 함 |
+
+제출 시 서버는 현재 동의문 전문(`CONSENT_BODY`)과 SHA-256 해시를 `consent_notice` / `consent`에 함께 저장합니다. IP(`x-forwarded-for`)와 User-Agent도 기록합니다. `consent.student_id`는 `ON DELETE CASCADE`가 없어 참가자 삭제 후에도 증빙이 남습니다.
+
+현재 동의문 버전: `2026.08.31-1` (`src/lib/consent-notice.ts`)
 
 ### Response `201 Created`
 
@@ -150,9 +159,9 @@ httpOnly 쿠키 `qrious_admin`으로 인증합니다. 비밀번호는 `ADMIN_PAS
 | POST | `/api/admin/login` | `{ "password" }` → 세션 쿠키 |
 | POST | `/api/admin/logout` | 쿠키 삭제 |
 | GET | `/api/admin/session` | `{ "authenticated": true }` |
-| GET | `/api/admin/students` | 참가자 + have/want/ex_have/ex_want |
-| GET | `/api/admin/students/export` | 조인된 참가자 xlsx (`?q=` 이름/학번 검색) |
-| DELETE | `/api/admin/students/{studentId}` | 참가자 삭제 (have/want/ex CASCADE) |
+| GET | `/api/admin/students` | 참가자 + have/want/ex + 최근 동의 여부/시각/버전 |
+| GET | `/api/admin/students/export` | 조인된 참가자 xlsx (`?q=` 이름/학번 검색, 동의 컬럼 포함) |
+| DELETE | `/api/admin/students/{studentId}` | 참가자 삭제 (have/want/ex CASCADE, **consent는 유지**) |
 | POST | `/api/admin/charms` | `{ "name" }` 태그 추가 |
 | DELETE | `/api/admin/charms/{charmId}` | 태그 삭제 (have/want CASCADE) |
 

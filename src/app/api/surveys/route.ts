@@ -1,4 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
+import {
+  CONSENT_BODY,
+  CONSENT_HASH,
+  CONSENT_ITEMS,
+  CONSENT_OPTIONAL_ITEMS,
+  CONSENT_PURPOSE,
+  CONSENT_REFUSAL,
+  CONSENT_RETENTION,
+  CONSENT_TITLE,
+  CONSENT_VERSION,
+} from '@/lib/consent';
 import { getSql } from '@/lib/db';
 import { isUniqueViolation, jsonError } from '@/lib/http';
 
@@ -17,6 +28,7 @@ const UUID_RE =
 type SurveyBody = {
   student_id?: unknown;
   name?: unknown;
+  phone?: unknown;
   gender?: unknown;
   age?: unknown;
   mbti?: unknown;
@@ -24,6 +36,8 @@ type SurveyBody = {
   want_charm_ids?: unknown;
   ex_have?: unknown;
   ex_want?: unknown;
+  consent_agreed?: unknown;
+  consent_version?: unknown;
 };
 
 function asTrimmedString(value: unknown): string | null {
@@ -50,6 +64,8 @@ export async function POST(req: NextRequest) {
 
   const studentId = asTrimmedString(body.student_id);
   const name = asTrimmedString(body.name);
+  const phoneRaw = asTrimmedString(body.phone);
+  const phoneDigits = phoneRaw ? phoneRaw.replace(/\D/g, '') : '';
   const mbti = asTrimmedString(body.mbti)?.toUpperCase() ?? null;
   const haveCharmIds = asCharmIds(body.have_charm_ids);
   const wantCharmIds = asCharmIds(body.want_charm_ids);
@@ -64,6 +80,13 @@ export async function POST(req: NextRequest) {
   if (!name || name.length < 2) {
     return jsonError(400, 'VALIDATION_ERROR', '이름을 올바르게 입력해 주세요.');
   }
+  if (!/^01[016789]\d{7,8}$/.test(phoneDigits)) {
+    return jsonError(400, 'VALIDATION_ERROR', '전화번호를 올바르게 입력해 주세요.');
+  }
+  const phone =
+    phoneDigits.length === 11
+      ? `${phoneDigits.slice(0, 3)}-${phoneDigits.slice(3, 7)}-${phoneDigits.slice(7)}`
+      : `${phoneDigits.slice(0, 3)}-${phoneDigits.slice(3, 6)}-${phoneDigits.slice(6)}`;
   if (typeof body.gender !== 'boolean') {
     return jsonError(400, 'VALIDATION_ERROR', '성별을 선택해 주세요.');
   }
@@ -90,6 +113,20 @@ export async function POST(req: NextRequest) {
       400,
       'VALIDATION_ERROR',
       '이상형 매력을 하나 이상 선택해 주세요.'
+    );
+  }
+  if (body.consent_agreed !== true) {
+    return jsonError(
+      400,
+      'VALIDATION_ERROR',
+      '개인정보 수집·이용에 동의해 주세요.'
+    );
+  }
+  if (asTrimmedString(body.consent_version) !== CONSENT_VERSION) {
+    return jsonError(
+      400,
+      'VALIDATION_ERROR',
+      '동의문 버전이 올바르지 않습니다. 페이지를 새로고침한 뒤 다시 동의해 주세요.'
     );
   }
 
@@ -129,8 +166,8 @@ export async function POST(req: NextRequest) {
 
     const queries = [
       sql`
-        INSERT INTO student (student_id, name, gender, age, mbti)
-        VALUES (${studentId}, ${name}, ${gender}, ${age}, ${mbti})
+        INSERT INTO student (student_id, name, phone, gender, age, mbti)
+        VALUES (${studentId}, ${name}, ${phone}, ${gender}, ${age}, ${mbti})
       `,
       ...haveCharmIds.map(
         (charmId) => sql`
@@ -158,6 +195,47 @@ export async function POST(req: NextRequest) {
         VALUES (${studentId}, ${exWant})
       `);
     }
+
+    const ipAddress =
+      req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+      req.headers.get('x-real-ip') ||
+      null;
+    const userAgent = req.headers.get('user-agent') || null;
+
+    queries.push(sql`
+      INSERT INTO consent_notice (
+        version, title, body, purpose, collected_items, optional_items,
+        retention_period, refusal_notice, body_hash
+      )
+      VALUES (
+        ${CONSENT_VERSION},
+        ${CONSENT_TITLE},
+        ${CONSENT_BODY},
+        ${CONSENT_PURPOSE},
+        ${CONSENT_ITEMS},
+        ${CONSENT_OPTIONAL_ITEMS},
+        ${CONSENT_RETENTION},
+        ${CONSENT_REFUSAL},
+        ${CONSENT_HASH}
+      )
+      ON CONFLICT (version) DO NOTHING
+    `);
+
+    queries.push(sql`
+      INSERT INTO consent (
+        student_id, notice_version, agreed, consent_text_snapshot,
+        consent_hash, ip_address, user_agent
+      )
+      VALUES (
+        ${studentId},
+        ${CONSENT_VERSION},
+        true,
+        ${CONSENT_BODY},
+        ${CONSENT_HASH},
+        ${ipAddress},
+        ${userAgent}
+      )
+    `);
 
     await sql.transaction(queries);
 

@@ -11,6 +11,18 @@ import {
   ApiError,
   type Charm,
 } from '@/lib/api';
+import {
+  CONSENT_ITEMS,
+  CONSENT_OPTIONAL_ITEMS,
+  CONSENT_PROCESSOR,
+  CONSENT_PURPOSE,
+  CONSENT_REFUSAL,
+  CONSENT_RETENTION,
+  CONSENT_THIRD_PARTY,
+  CONSENT_ENTRUSTMENT,
+  CONSENT_TITLE,
+  CONSENT_VERSION,
+} from '@/lib/consent-notice';
 
 const MBTI_OPTIONS = [
   'ISTJ', 'ISFJ', 'INFJ', 'INTJ',
@@ -19,9 +31,39 @@ const MBTI_OPTIONS = [
   'ESTJ', 'ESFJ', 'ENFJ', 'ENTJ',
 ] as const;
 
+const MBTI_AXES = [
+  { key: 'ei', left: 'E', right: 'I', leftHint: '외향', rightHint: '내향' },
+  { key: 'ns', left: 'N', right: 'S', leftHint: '직관', rightHint: '감각' },
+  { key: 'tf', left: 'T', right: 'F', leftHint: '사고', rightHint: '감정' },
+  { key: 'jp', left: 'J', right: 'P', leftHint: '판단', rightHint: '인식' },
+] as const;
+
+type MbtiAxisKey = (typeof MBTI_AXES)[number]['key'];
+type MbtiAxes = Record<MbtiAxisKey, string | null>;
+
+const initialMbtiAxes: MbtiAxes = { ei: 'E', ns: 'N', tf: 'T', jp: 'J' };
+
+function composeMbti(axes: MbtiAxes): string {
+  if (!axes.ei || !axes.ns || !axes.tf || !axes.jp) return '';
+  return `${axes.ei}${axes.ns}${axes.tf}${axes.jp}`;
+}
+
+function formatKrPhone(digits: string): string {
+  const d = digits.replace(/\D/g, '').slice(0, 11);
+  if (d.length <= 3) return d;
+  if (d.length <= 7) return `${d.slice(0, 3)}-${d.slice(3)}`;
+  return `${d.slice(0, 3)}-${d.slice(3, 7)}-${d.slice(7)}`;
+}
+
+function isValidKrPhone(value: string): boolean {
+  const d = value.replace(/\D/g, '');
+  return /^01[016789]\d{7,8}$/.test(d);
+}
+
 type FormData = {
   studentId: string;
   name: string;
+  phone: string;
   gender: boolean | null;
   age: string;
   mbti: string;
@@ -29,55 +71,67 @@ type FormData = {
   wantCharmIds: string[];
   exHave: string;
   exWant: string;
+  consent: boolean;
 };
 
 type FieldKey =
   | 'studentId'
   | 'name'
+  | 'phone'
   | 'gender'
   | 'age'
   | 'mbti'
   | 'haveCharmIds'
-  | 'wantCharmIds';
+  | 'wantCharmIds'
+  | 'consent';
 
 const initialFormData: FormData = {
   studentId: '',
   name: '',
+  phone: '',
   gender: null,
   age: '',
-  mbti: '',
+  mbti: 'ENTJ',
   haveCharmIds: [],
   wantCharmIds: [],
   exHave: '',
   exWant: '',
+  consent: false,
 };
 
 export default function Home() {
   const [formData, setFormData] = useState<FormData>(initialFormData);
 
+  const [mbtiAxes, setMbtiAxes] = useState<MbtiAxes>(initialMbtiAxes);
+
   const [touched, setTouched] = useState<Record<FieldKey, boolean>>({
     studentId: false,
     name: false,
+    phone: false,
     gender: false,
     age: false,
     mbti: false,
     haveCharmIds: false,
     wantCharmIds: false,
+    consent: false,
   });
 
   const [errors, setErrors] = useState<Record<FieldKey, string>>({
     studentId: '',
     name: '',
+    phone: '',
     gender: '',
     age: '',
     mbti: '',
     haveCharmIds: '',
     wantCharmIds: '',
+    consent: '',
   });
 
   const [charms, setCharms] = useState<Charm[]>([]);
   const [charmsLoading, setCharmsLoading] = useState(true);
   const [charmsError, setCharmsError] = useState('');
+  const [consentOpen, setConsentOpen] = useState(false);
 
   const [stats, setStats] = useState({
     total: 0,
@@ -161,6 +215,13 @@ export default function Home() {
         if (!/^\d{10}$/.test(v)) return '학번은 정확히 10자리 숫자여야 합니다.';
         return '';
       }
+      case 'phone': {
+        const v = typeof value === 'string' ? value.trim() : '';
+        if (!v) return '전화번호를 입력해 주세요.';
+        if (!isValidKrPhone(v))
+          return '휴대폰 번호 형식(010-1234-5678)으로 입력해 주세요.';
+        return '';
+      }
       case 'age': {
         const v = typeof value === 'string' ? value.trim() : '';
         if (!v) return '나이를 입력해 주세요.';
@@ -184,6 +245,9 @@ export default function Home() {
         if (!Array.isArray(value) || value.length === 0)
           return '이상형 매력을 하나 이상 선택해 주세요.';
         return '';
+      case 'consent':
+        if (value !== true) return '개인정보 수집·이용에 동의해 주세요.';
+        return '';
       default:
         return '';
     }
@@ -197,6 +261,9 @@ export default function Home() {
 
     if (name === 'studentId') {
       finalValue = value.replace(/\D/g, '').slice(0, 10);
+    }
+    if (name === 'phone') {
+      finalValue = formatKrPhone(value);
     }
     if (name === 'age') {
       finalValue = value.replace(/\D/g, '').slice(0, 2);
@@ -217,6 +284,15 @@ export default function Home() {
     setFormData((prev) => ({ ...prev, gender: value }));
     setTouched((prev) => ({ ...prev, gender: true }));
     setErrors((prev) => ({ ...prev, gender: '' }));
+  };
+
+  const handleMbtiAxis = (key: MbtiAxisKey, letter: string) => {
+    const nextAxes = { ...mbtiAxes, [key]: letter };
+    setMbtiAxes(nextAxes);
+    const nextMbti = composeMbti(nextAxes);
+    setFormData((prev) => ({ ...prev, mbti: nextMbti }));
+    setTouched((prev) => ({ ...prev, mbti: true }));
+    setErrors((prev) => ({ ...prev, mbti: validateField('mbti', nextMbti) }));
   };
 
   const toggleCharm = (group: 'haveCharmIds' | 'wantCharmIds', charmId: string) => {
@@ -249,31 +325,37 @@ export default function Home() {
     const fields: FieldKey[] = [
       'studentId',
       'name',
+      'phone',
       'gender',
       'age',
       'mbti',
       'haveCharmIds',
       'wantCharmIds',
+      'consent',
     ];
 
     setTouched({
       studentId: true,
       name: true,
+      phone: true,
       gender: true,
       age: true,
       mbti: true,
       haveCharmIds: true,
       wantCharmIds: true,
+      consent: true,
     });
 
     const newErrors = {
       studentId: validateField('studentId', formData.studentId),
       name: validateField('name', formData.name),
+      phone: validateField('phone', formData.phone),
       gender: validateField('gender', formData.gender),
       age: validateField('age', formData.age),
       mbti: validateField('mbti', formData.mbti),
       haveCharmIds: validateField('haveCharmIds', formData.haveCharmIds),
       wantCharmIds: validateField('wantCharmIds', formData.wantCharmIds),
+      consent: validateField('consent', formData.consent),
     };
 
     setErrors(newErrors);
@@ -299,6 +381,7 @@ export default function Home() {
       await submitSurvey({
         student_id: formData.studentId,
         name: formData.name.trim(),
+        phone: formData.phone.trim(),
         gender: formData.gender as boolean,
         age: Number(formData.age),
         mbti: formData.mbti,
@@ -306,6 +389,8 @@ export default function Home() {
         want_charm_ids: formData.wantCharmIds,
         ex_have: exHave || null,
         ex_want: exWant || null,
+        consent_agreed: true,
+        consent_version: CONSENT_VERSION,
       });
 
       setSubmitted(true);
@@ -326,7 +411,7 @@ export default function Home() {
     }
   };
 
-  const textInputKeys = ['studentId', 'name', 'age', 'mbti'] as const;
+  const textInputKeys = ['studentId', 'name', 'phone', 'age'] as const;
 
   const getInputClass = (fieldName: (typeof textInputKeys)[number]) => {
     const base =
@@ -367,7 +452,19 @@ export default function Home() {
       >
         관리자
       </Link>
-      <div className="max-w-[480px] mx-auto px-4 py-12">
+      <div className="max-w-[480px] mx-auto px-4 pt-6 pb-12">
+        <div className="flex items-center justify-center gap-2 mb-5">
+          <Image
+            src="/ysu-logo.svg"
+            alt="영남대학교"
+            width={32}
+            height={32}
+            className="h-8 w-8 object-contain"
+          />
+          <p className="text-sm font-semibold tracking-wide text-[#8C7A8E]">
+            컴소과 X 총학생회
+          </p>
+        </div>
         {/* Header */}
         <div className="text-center mb-8">
           <div className="relative mx-auto mb-3 h-[120px] w-[120px] sm:h-[140px] sm:w-[140px]">
@@ -565,6 +662,50 @@ export default function Home() {
                 </p>
               </div>
 
+              {/* Phone */}
+              <div className="flex flex-col gap-1">
+                <label
+                  htmlFor="phone"
+                  className="flex flex-wrap items-center gap-y-0.5 text-xs font-semibold text-[#8C7A8E] tracking-wider uppercase"
+                >
+                  <span>
+                    📞 전화번호<span className="text-[#E8526A]">*</span>
+                  </span>
+                  <span className="text-[10px] text-[#8C7A8E] normal-case sm:ml-2 font-normal leading-relaxed">
+                    매칭 연락에 사용해요. 외부에 공개되지 않아요.
+                  </span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="tel"
+                    id="phone"
+                    name="phone"
+                    placeholder="010-1234-5678"
+                    maxLength={13}
+                    inputMode="numeric"
+                    autoComplete="tel"
+                    value={formData.phone}
+                    onChange={handleChange}
+                    onBlur={handleBlur}
+                    className={`${getInputClass('phone')} pr-12`}
+                  />
+                  {touched.phone && (
+                    <span
+                      className={`absolute right-4 top-1/2 -translate-y-1/2 font-bold text-lg pointer-events-none transition-all duration-200 ${
+                        errors.phone ? 'text-[#E8526A]' : 'text-[#4CAF82]'
+                      }`}
+                    >
+                      {errors.phone ? '✕' : '✓'}
+                    </span>
+                  )}
+                </div>
+                <p
+                  className={`text-xs leading-relaxed transition-all duration-150 ${getHintDetails('phone').style}`}
+                >
+                  {getHintDetails('phone').text}
+                </p>
+              </div>
+
               <hr className="border-t-1.5 border-dashed border-[#F0D9DF] my-5" />
 
               {/* Gender */}
@@ -663,38 +804,99 @@ export default function Home() {
               </div>
 
               {/* MBTI */}
-              <div className="flex flex-col gap-1">
-                <label
-                  htmlFor="mbti"
-                  className="flex flex-wrap items-center gap-y-0.5 text-xs font-semibold text-[#8C7A8E] tracking-wider uppercase"
-                >
-                  <span>
+              <div className="flex flex-col gap-2" id="mbti">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <label className="text-xs font-semibold text-[#8C7A8E] tracking-wider uppercase">
                     🧠 MBTI<span className="text-[#E8526A]">*</span>
-                  </span>
-                </label>
-                <div className="relative">
-                  <select
-                    id="mbti"
-                    name="mbti"
-                    value={formData.mbti}
-                    onChange={handleChange}
-                    onBlur={handleBlur}
-                    className={`${getInputClass('mbti')} pr-10`}
+                  </label>
+                  <span
+                    className={`text-sm font-bold tracking-[0.2em] ${
+                      formData.mbti ? 'text-[#E8526A]' : 'text-[#C9B0BE]'
+                    }`}
                   >
-                    <option value="" disabled>
-                      MBTI를 선택해 주세요
-                    </option>
-                    {MBTI_OPTIONS.map((type) => (
-                      <option key={type} value={type}>
-                        {type}
-                      </option>
-                    ))}
-                  </select>
+                    {formData.mbti || '----'}
+                  </span>
+                </div>
+                <div className="rounded-2xl border border-[#F0D9DF] bg-[#FDE8EC]/70 px-3 py-4">
+                  <div className="grid grid-cols-4 gap-2">
+                    {MBTI_AXES.map((axis) => {
+                      const selected = mbtiAxes[axis.key];
+                      const isBottom = selected === axis.right;
+                      return (
+                        <div
+                          key={axis.key}
+                          className="flex flex-col items-center gap-2"
+                        >
+                          <button
+                            type="button"
+                            onClick={() => handleMbtiAxis(axis.key, axis.left)}
+                            className={`text-center transition-colors ${
+                              selected === axis.left
+                                ? 'text-[#E8526A]'
+                                : 'text-[#8C7A8E]'
+                            }`}
+                          >
+                            <span className="block text-lg font-extrabold leading-none">
+                              {axis.left}
+                            </span>
+                            <span className="block text-[10px] font-semibold mt-0.5">
+                              {axis.leftHint}
+                            </span>
+                          </button>
+                          <button
+                            type="button"
+                            role="switch"
+                            aria-checked={isBottom}
+                            aria-label={`${axis.left} 또는 ${axis.right}`}
+                            onClick={() =>
+                              handleMbtiAxis(
+                                axis.key,
+                                isBottom ? axis.left : axis.right
+                              )
+                            }
+                            className={`relative h-16 w-9 rounded-full transition-colors duration-200 ${
+                              selected ? 'bg-[#E8526A]' : 'bg-[#F0D9DF]'
+                            }`}
+                          >
+                            <span
+                              className={`absolute left-1 h-7 w-7 rounded-full bg-white shadow-sm transition-all duration-200 ${
+                                isBottom ? 'top-[calc(100%-2rem)]' : 'top-1'
+                              }`}
+                            />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleMbtiAxis(axis.key, axis.right)}
+                            className={`text-center transition-colors ${
+                              selected === axis.right
+                                ? 'text-[#E8526A]'
+                                : 'text-[#8C7A8E]'
+                            }`}
+                          >
+                            <span className="block text-lg font-extrabold leading-none">
+                              {axis.right}
+                            </span>
+                            <span className="block text-[10px] font-semibold mt-0.5">
+                              {axis.rightHint}
+                            </span>
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
                 <p
-                  className={`text-xs leading-relaxed transition-all duration-150 ${getHintDetails('mbti').style}`}
+                  className={`text-xs leading-relaxed transition-all duration-150 ${
+                    touched.mbti && errors.mbti
+                      ? 'text-[#E8526A] min-h-[16px] mt-1'
+                      : touched.mbti && !errors.mbti
+                        ? 'text-[#4CAF82] font-semibold min-h-[16px] mt-1'
+                        : 'text-[#8C7A8E] min-h-[0px] mt-0'
+                  }`}
                 >
-                  {getHintDetails('mbti').text}
+                  {touched.mbti
+                    ? errors.mbti || '✓ 확인됐어요'
+                    : ''}
                 </p>
               </div>
 
@@ -882,6 +1084,97 @@ export default function Home() {
                     {formData.exWant.length} / 300
                   </div>
                 </div>
+              </div>
+              {/* Privacy consent */}
+              <div className="flex flex-col gap-2" id="consent" tabIndex={-1}>
+                <h3 className="text-base font-bold text-[#2B1B2E]">
+                  {CONSENT_TITLE}
+                  <span className="text-[#E8526A]">*</span>
+                </h3>
+                <p className="text-[11px] text-[#8C7A8E] leading-relaxed">
+                  개인정보처리자: {CONSENT_PROCESSOR} · 동의문 버전 {CONSENT_VERSION}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setConsentOpen((open) => !open)}
+                  aria-expanded={consentOpen}
+                  className="self-start text-sm font-semibold text-[#E8526A] underline underline-offset-2 decoration-[#E8526A]/50 hover:decoration-[#E8526A]"
+                >
+                  {consentOpen ? '전문 닫기' : '전문 보기'}
+                </button>
+                {consentOpen && (
+                  <div className="max-h-56 overflow-y-auto rounded-xl border border-[#F0D9DF] bg-[#FDE8EC]/50 px-3 py-3 text-[12px] leading-relaxed text-[#2B1B2E] space-y-2.5">
+                    <p>
+                      QRious는 「개인정보 보호법」 제15조에 따라 아래 사항을 알리고
+                      동의를 받습니다.
+                    </p>
+                    <p>
+                      <span className="font-bold">수집·이용 목적</span>
+                      <br />
+                      {CONSENT_PURPOSE}
+                    </p>
+                    <p>
+                      <span className="font-bold">수집 항목</span>
+                      <br />
+                      필수: {CONSENT_ITEMS}
+                      <br />
+                      선택: {CONSENT_OPTIONAL_ITEMS}
+                    </p>
+                    <p>
+                      <span className="font-bold underline decoration-[#E8526A] underline-offset-2">
+                        보유 및 이용 기간
+                      </span>
+                      <br />
+                      {CONSENT_RETENTION}
+                    </p>
+                    <p>
+                      <span className="font-bold">동의 거부 권리 및 불이익</span>
+                      <br />
+                      {CONSENT_REFUSAL}
+                    </p>
+                    <p>
+                      <span className="font-bold">제3자 제공</span>
+                      <br />
+                      {CONSENT_THIRD_PARTY}
+                    </p>
+                    <p>
+                      <span className="font-bold">처리 위탁</span>
+                      <br />
+                      {CONSENT_ENTRUSTMENT}
+                    </p>
+                  </div>
+                )}
+                <label className="flex items-start gap-2.5 text-sm leading-relaxed cursor-pointer">
+                  <input
+                    id="consent-checkbox"
+                    type="checkbox"
+                    checked={formData.consent}
+                    onChange={(e) => {
+                      const next = e.target.checked;
+                      setFormData((prev) => ({ ...prev, consent: next }));
+                      setTouched((prev) => ({ ...prev, consent: true }));
+                      setErrors((prev) => ({
+                        ...prev,
+                        consent: validateField('consent', next),
+                      }));
+                    }}
+                    className="mt-1 h-4 w-4 shrink-0 accent-[#E8526A]"
+                  />
+                  <span>
+                    개인정보 수집·이용 내용을 확인했으며 이에 동의합니다. (필수)
+                  </span>
+                </label>
+                <p
+                  className={`text-xs leading-relaxed ${
+                    touched.consent && errors.consent
+                      ? 'text-[#E8526A]'
+                      : 'text-[#8C7A8E]'
+                  }`}
+                >
+                  {touched.consent && errors.consent
+                    ? errors.consent
+                    : `전문은 저장 시 버전 ${CONSENT_VERSION}으로 기록됩니다.`}
+                </p>
               </div>
             </form>
 

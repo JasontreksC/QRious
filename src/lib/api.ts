@@ -58,6 +58,7 @@ export type SurveyStats = {
 export type SurveyPayload = {
   student_id: string;
   name: string;
+  phone: string;
   gender: boolean;
   age: number;
   mbti: string;
@@ -65,6 +66,8 @@ export type SurveyPayload = {
   want_charm_ids: string[];
   ex_have?: string | null;
   ex_want?: string | null;
+  consent_agreed: boolean;
+  consent_version: string;
 };
 
 export type SurveyResponse = {
@@ -92,6 +95,7 @@ export async function submitSurvey(
 export type AdminStudent = {
   student_id: string;
   name: string;
+  phone: string;
   gender: boolean;
   age: number | null;
   mbti: string;
@@ -99,6 +103,9 @@ export type AdminStudent = {
   want: string[];
   ex_have: string | null;
   ex_want: string | null;
+  consent_agreed: boolean | null;
+  consented_at: string | null;
+  consent_version: string | null;
 };
 
 export async function getAdminSession(): Promise<{ authenticated: boolean }> {

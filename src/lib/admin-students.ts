@@ -2,9 +2,9 @@ import type { Sql } from '@/lib/db';
 import type { AdminStudent } from '@/lib/api';
 
 export async function fetchJoinedStudents(sql: Sql): Promise<AdminStudent[]> {
-  const [students, haves, wants, exHaves, exWants] = await Promise.all([
+  const [students, haves, wants, exHaves, exWants, consents] = await Promise.all([
     sql`
-      SELECT student_id, name, gender, age, mbti
+      SELECT student_id, name, phone, gender, age, mbti
       FROM student
       ORDER BY student_id ASC
     `,
@@ -22,6 +22,11 @@ export async function fetchJoinedStudents(sql: Sql): Promise<AdminStudent[]> {
     `,
     sql`SELECT student_id, charm FROM ex_have`,
     sql`SELECT student_id, charm FROM ex_want`,
+    sql`
+      SELECT student_id, agreed, consented_at, notice_version
+      FROM consent
+      ORDER BY consented_at DESC
+    `,
   ]);
 
   const haveMap = new Map<string, string[]>();
@@ -50,11 +55,28 @@ export async function fetchJoinedStudents(sql: Sql): Promise<AdminStudent[]> {
     exWantMap.set(String(row.student_id), String(row.charm ?? ''));
   }
 
+  const consentMap = new Map<
+    string,
+    { agreed: boolean; consented_at: string; version: string }
+  >();
+  for (const row of consents) {
+    const id = String(row.student_id);
+    if (consentMap.has(id)) continue;
+    consentMap.set(id, {
+      agreed: Boolean(row.agreed),
+      consented_at: row.consented_at
+        ? new Date(String(row.consented_at)).toISOString()
+        : '',
+      version: String(row.notice_version ?? ''),
+    });
+  }
+
   return students.map((row) => {
     const id = String(row.student_id);
     return {
       student_id: id,
       name: row.name ?? '',
+      phone: row.phone ?? '',
       gender: Boolean(row.gender),
       age: row.age === null ? null : Number(row.age),
       mbti: row.mbti ?? '',
@@ -62,6 +84,9 @@ export async function fetchJoinedStudents(sql: Sql): Promise<AdminStudent[]> {
       want: wantMap.get(id) ?? [],
       ex_have: exHaveMap.get(id) || null,
       ex_want: exWantMap.get(id) || null,
+      consent_agreed: consentMap.get(id)?.agreed ?? null,
+      consented_at: consentMap.get(id)?.consented_at || null,
+      consent_version: consentMap.get(id)?.version || null,
     };
   });
 }

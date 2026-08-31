@@ -182,6 +182,7 @@ export default function AdminStudentsPage() {
               <tr className="text-xs uppercase tracking-wider text-[#8C7A8E] border-b border-[#F0D9DF]">
                 <th className="py-2 px-5 font-semibold">학번</th>
                 <th className="py-2 pr-3 font-semibold">이름</th>
+                <th className="py-2 pr-3 font-semibold">전화번호</th>
                 <th className="py-2 pr-3 font-semibold">성별</th>
                 <th className="py-2 pr-3 font-semibold">나이</th>
                 <th className="py-2 pr-3 font-semibold">MBTI</th>
@@ -198,6 +199,9 @@ export default function AdminStudentsPage() {
                         {student.student_id}
                       </td>
                       <td className="py-3 pr-3">{student.name}</td>
+                      <td className="py-3 pr-3 font-mono text-[13px]">
+                        {student.phone || '-'}
+                      </td>
                       <td className="py-3 pr-3">
                         {student.gender ? '여자' : '남자'}
                       </td>
@@ -227,7 +231,7 @@ export default function AdminStudentsPage() {
                     </tr>
                     {open && (
                       <tr className="bg-[#FDE8EC]/50">
-                        <td colSpan={6} className="px-5 py-4">
+                        <td colSpan={7} className="px-5 py-4">
                           <div className="grid gap-3 sm:grid-cols-2">
                             <DetailBlock
                               title="have (나의 매력)"
@@ -250,6 +254,24 @@ export default function AdminStudentsPage() {
                               </span>
                               <br />
                               {student.ex_want || '없음'}
+                            </p>
+                            <p className="text-xs leading-relaxed sm:col-span-2">
+                              <span className="font-semibold text-[#8C7A8E]">
+                                개인정보 수집·이용 동의
+                              </span>
+                              <br />
+                              {student.consent_agreed === true
+                                ? '동의'
+                                : '미확인'}
+                              {student.consented_at
+                                ? ` · ${new Date(student.consented_at).toLocaleString(
+                                    'ko-KR',
+                                    { timeZone: 'Asia/Seoul' }
+                                  )}`
+                                : ''}
+                              {student.consent_version
+                                ? ` · 버전 ${student.consent_version}`
+                                : ''}
                             </p>
                           </div>
                         </td>

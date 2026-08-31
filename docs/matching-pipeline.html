@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <title>QRious 최종 매칭 산출</title>
+  <style>
+    @page { size: A4; margin: 16mm 14mm; }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      color: #1a1a1a;
+      background: #fff;
+      font-family: "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif;
+      font-size: 11.5px;
+      line-height: 1.45;
+    }
+    h1 { font-size: 22px; margin: 0 0 6px; letter-spacing: -0.02em; }
+    h2 { font-size: 14px; margin: 18px 0 8px; border-bottom: 1px solid #d8d8d8; padding-bottom: 4px; }
+    h3 { font-size: 12px; margin: 0 0 8px; }
+    p { margin: 0 0 8px; }
+    .sub { color: #555; }
+    .muted { color: #777; font-size: 10.5px; }
+    .callout {
+      border: 1px solid #b9c7d9;
+      background: #f3f6fa;
+      padding: 10px 12px;
+      margin: 12px 0 16px;
+    }
+    .callout strong { display: block; margin-bottom: 4px; }
+    code {
+      font-family: ui-monospace, "SF Mono", Menlo, monospace;
+      font-size: 10.5px;
+      background: #eee;
+      padding: 1px 4px;
+    }
+    .stats { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin: 10px 0; }
+    .stat { border: 1px solid #ddd; padding: 8px 10px; }
+    .stat b { display: block; font-size: 13px; }
+    .stat span { color: #666; font-size: 10.5px; }
+    .cards { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+    .card { border: 1px solid #ddd; padding: 10px; break-inside: avoid; }
+    .card h3 { display: flex; justify-content: space-between; align-items: baseline; }
+    .pct { font-size: 10px; color: #444; font-weight: 600; }
+    .bar { display: flex; height: 10px; margin: 8px 0 4px; border: 1px solid #ccc; }
+    .bar i { display: block; height: 100%; }
+    .bar .m { width: 10%; background: #c5c5c5; }
+    .bar .t { width: 60%; background: #8aa4c2; }
+    .bar .e { width: 30%; background: #9bb89a; }
+    table { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 11px; }
+    th, td { border: 1px solid #ddd; padding: 5px 7px; text-align: left; vertical-align: top; }
+    th { background: #f4f4f4; font-weight: 600; }
+    td.num, th.num { text-align: right; }
+    td.ctr { text-align: center; width: 42px; }
+    .ok { border-left: 3px solid #3a7a3a; }
+    .info { border-left: 3px solid #3a6ea8; }
+    .warn { border-left: 3px solid #b07a20; }
+    svg { display: block; max-width: 100%; }
+    .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .note { margin-top: 4px; }
+    .flow-wrap { margin: 8px 0 4px; }
+  </style>
+</head>
+<body>
+  <h1>QRious 최종 매칭 산출</h1>
+  <p class="sub">사전 접수 마감 후 한 번 도는 배치. 남·여 전 쌍에 세 점수를 매기고, 그리디로 겹치지 않는 1:1 짝을 고른다.</p>
+
+  <div class="callout">
+    <strong>최종 식 (기본 가중치 1 : 6 : 3)</strong>
+    EX가 있으면 <code>final = 0.10·MBTI + 0.60·TAG + 0.30·EX</code>.
+    세 항 모두 0~1. EX가 완전 결측이면 그 항을 빼고
+    <code>0.10/0.70 · MBTI + 0.60/0.70 · TAG</code>.
+  </div>
+
+  <h2>전체 흐름</h2>
+  <div class="flow-wrap">
+    <svg viewBox="0 0 520 430" width="520" height="430">
+      <defs>
+        <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M 0 1.5 L 8 5 L 0 8.5 Z" fill="#444"/>
+        </marker>
+      </defs>
+      <g fill="none" stroke="#444" stroke-width="1.2" marker-end="url(#arrow)">
+        <line x1="260" y1="36" x2="260" y2="52"/>
+        <line x1="260" y1="88" x2="260" y2="104"/>
+        <line x1="260" y1="140" x2="88" y2="168"/>
+        <line x1="260" y1="140" x2="260" y2="168"/>
+        <line x1="260" y1="140" x2="432" y2="168"/>
+        <line x1="88" y1="204" x2="260" y2="232"/>
+        <line x1="260" y1="204" x2="260" y2="232"/>
+        <line x1="432" y1="204" x2="260" y2="232"/>
+        <line x1="260" y1="268" x2="260" y2="284"/>
+        <line x1="260" y1="320" x2="260" y2="336"/>
+        <line x1="260" y1="372" x2="260" y2="388"/>
+      </g>
+      <g font-family="Apple SD Gothic Neo, sans-serif" font-size="12" text-anchor="middle">
+        <rect x="176" y="8" width="168" height="28" rx="4" fill="#fff" stroke="#888"/>
+        <text x="260" y="27">접수 데이터</text>
+        <rect x="176" y="52" width="168" height="36" rx="4" fill="#fff" stroke="#888"/>
+        <text x="260" y="75">남 / 여 분리</text>
+        <rect x="176" y="104" width="168" height="36" rx="4" fill="#fff" stroke="#888"/>
+        <text x="260" y="127">전 쌍 열거  M × W</text>
+        <rect x="20" y="168" width="136" height="36" rx="4" fill="#eef3f8" stroke="#3a6ea8"/>
+        <text x="88" y="183">TAG  포함계수</text>
+        <text x="88" y="197" font-size="10" fill="#666">0 ~ 1</text>
+        <rect x="192" y="168" width="136" height="36" rx="4" fill="#eef3f8" stroke="#3a6ea8"/>
+        <text x="260" y="183">MBTI  4축</text>
+        <text x="260" y="197" font-size="10" fill="#666">0 ~ 1</text>
+        <rect x="364" y="168" width="136" height="36" rx="4" fill="#eef3f8" stroke="#3a6ea8"/>
+        <text x="432" y="183">EX  코사인</text>
+        <text x="432" y="197" font-size="10" fill="#666">0 ~ 1</text>
+        <rect x="176" y="232" width="168" height="36" rx="4" fill="#fff" stroke="#888"/>
+        <text x="260" y="255">가중합  0~1</text>
+        <rect x="176" y="284" width="168" height="36" rx="4" fill="#fff" stroke="#888"/>
+        <text x="260" y="307">전 쌍 내림차순</text>
+        <rect x="176" y="336" width="168" height="36" rx="4" fill="#fff" stroke="#888"/>
+        <text x="260" y="359">그리디 1:1 배정</text>
+        <rect x="176" y="388" width="168" height="36" rx="4" fill="#eef3f8" stroke="#3a6ea8"/>
+        <text x="260" y="411">매칭표 + 미매칭</text>
+      </g>
+    </svg>
+  </div>
+
+  <h2>1. 입력과 쌍 생성</h2>
+  <p>성별로 두 그룹을 나눈 뒤 가능한 모든 (남, 여) 쌍을 만든다. 기준 그룹은 두지 않는다. 남 50 · 여 40이면 쌍은 항상 2,000개다.</p>
+  <div class="stats">
+    <div class="stat"><b>have / want</b><span>필수 키워드 집합</span></div>
+    <div class="stat"><b>MBTI 4글자</b><span>E/I · N/S · T/F · J/P</span></div>
+    <div class="stat"><b>ex_have / ex_want</b><span>선택 자유 텍스트</span></div>
+  </div>
+
+  <h2>2. 쌍마다 세 점수</h2>
+  <p class="sub">각 점수는 0~1로 맞춘 뒤 가중 합한다. 방향이 두 개인 점수는 조화평균으로 합친다. 한쪽만 높으면 전체가 내려간다.</p>
+  <div class="bar" aria-hidden="true"><i class="m"></i><i class="t"></i><i class="e"></i></div>
+  <p class="muted">기본 가중치 1 : 6 : 3 &nbsp;·&nbsp; MBTI 10% · TAG 60% · EX 30% &nbsp;·&nbsp; 대안은 2:5:3</p>
+
+  <div class="cards">
+    <div class="card">
+      <h3>TAG <span class="pct">60%</span></h3>
+      <p class="sub">키워드 포함계수. 상대의 여분 매력은 분모에 넣지 않는다.</p>
+      <p><code>a = |A.want ∩ B.have| / |A.want|</code></p>
+      <p><code>b = |B.want ∩ A.have| / |B.want|</code></p>
+      <p><b>TAG = 2ab / (a + b)</b></p>
+      <p class="muted">a = b = 0 이면 0. 범위 0~1, 정규화 없음.</p>
+    </div>
+    <div class="card">
+      <h3>MBTI <span class="pct">10%</span></h3>
+      <p class="sub">축마다 0 또는 1. 합을 4로 나눈다.</p>
+      <p>E/I &nbsp;다르면 1</p>
+      <p>N/S &nbsp;같으면 1</p>
+      <p>T/F &nbsp;같으면 1</p>
+      <p>J/P &nbsp;다르면 1</p>
+      <p><b>MBTI = (0~4) / 4</b></p>
+    </div>
+    <div class="card">
+      <h3>EX <span class="pct">30%</span></h3>
+      <p class="sub">이상형 문장과 매력 문장만 비교한다. 자기소개끼리 비교하지 않는다.</p>
+      <p><code>a = cos(A.ex_want, B.ex_have)</code></p>
+      <p><code>b = cos(B.ex_want, A.ex_have)</code></p>
+      <p><b>둘 다 있으면 EX = 2ab / (a + b)</b></p>
+      <p class="muted">코사인은 0 미만을 0으로 자른 뒤 조화평균에 넣는다.</p>
+    </div>
+  </div>
+
+  <h2>3. EX 빈칸</h2>
+  <p>선택 필드이므로 빈칸은 0점이 아니다. 한 방향을 쓰려면 그 방향의 두 칸이 모두 있어야 한다. 빈 문자열은 임베딩하지 않는다.</p>
+  <svg viewBox="0 0 640 220" width="640" height="220">
+    <rect x="8" y="16" width="200" height="52" rx="5" fill="#f6f6f6" stroke="#999"/>
+    <text x="108" y="38" text-anchor="middle" font-size="12">A.ex_want 와 B.ex_have</text>
+    <text x="108" y="54" text-anchor="middle" font-size="11" fill="#666">둘 중 하나라도 없으면 결측</text>
+    <rect x="432" y="16" width="200" height="52" rx="5" fill="#f6f6f6" stroke="#999"/>
+    <text x="532" y="38" text-anchor="middle" font-size="12">B.ex_want 와 A.ex_have</text>
+    <text x="532" y="54" text-anchor="middle" font-size="11" fill="#666">둘 중 하나라도 없으면 결측</text>
+    <line x1="208" y1="42" x2="300" y2="42" stroke="#444"/>
+    <line x1="432" y1="42" x2="340" y2="42" stroke="#444"/>
+    <line x1="320" y1="42" x2="320" y2="88" stroke="#444"/>
+    <rect x="230" y="88" width="180" height="36" rx="5" fill="#fff" stroke="#3a6ea8"/>
+    <text x="320" y="111" text-anchor="middle" font-size="12">가용 방향 개수?</text>
+    <line x1="230" y1="106" x2="90" y2="106" stroke="#444"/>
+    <line x1="90" y1="106" x2="90" y2="148" stroke="#444"/>
+    <line x1="320" y1="124" x2="320" y2="148" stroke="#444"/>
+    <line x1="410" y1="106" x2="550" y2="106" stroke="#444"/>
+    <line x1="550" y1="106" x2="550" y2="148" stroke="#444"/>
+    <rect x="20" y="148" width="140" height="52" rx="5" fill="#f3f6fa" stroke="#999"/>
+    <text x="90" y="170" text-anchor="middle" font-size="12">2개 · 조화평균</text>
+    <text x="90" y="186" text-anchor="middle" font-size="10" fill="#666">2ab / (a+b)</text>
+    <rect x="250" y="148" width="140" height="52" rx="5" fill="#f3f6fa" stroke="#999"/>
+    <text x="320" y="170" text-anchor="middle" font-size="12">1개 · 절반</text>
+    <text x="320" y="186" text-anchor="middle" font-size="10" fill="#666">그 점수 ÷ 2</text>
+    <rect x="480" y="148" width="140" height="52" rx="5" fill="#f3f6fa" stroke="#999"/>
+    <text x="550" y="170" text-anchor="middle" font-size="12">0개 · 삭제</text>
+    <text x="550" y="186" text-anchor="middle" font-size="10" fill="#666">가중치 재조정</text>
+  </svg>
+  <table>
+    <thead>
+      <tr><th>가용 방향</th><th>EX 점수</th><th>최종 합산</th></tr>
+    </thead>
+    <tbody>
+      <tr class="ok"><td>A→B, B→A 둘 다</td><td>H = 2ab / (a + b)</td><td>0.10 M + 0.60 T + 0.30 EX</td></tr>
+      <tr class="info"><td>한 방향만</td><td>그 코사인 ÷ 2</td><td>0.10 M + 0.60 T + 0.30 EX</td></tr>
+      <tr class="warn"><td>둘 다 결측</td><td>EX 항 삭제</td><td>0.143 M + 0.857 T</td></tr>
+    </tbody>
+  </table>
+  <p class="muted note">한 방향만 있을 때 ÷2 하면, 가중치 0.30을 유지해도 기여 상한은 0.15로 줄어 양방향 조화평균과 균형이 맞는다. 둘 다 없으면 0을 넣지 않고 가중치를 다시 나눈다.</p>
+
+  <h2>4. 1:1 배정</h2>
+  <p>전 쌍을 한 테이블에 모아 순위만 매기면 같은 사람이 여러 번 뽑힌다. 점수로 정렬한 뒤, 뽑힌 두 사람을 포함하는 나머지 쌍을 지운다.</p>
+  <table>
+    <thead><tr><th class="ctr">순서</th><th>동작</th></tr></thead>
+    <tbody>
+      <tr><td class="ctr">1</td><td>모든 쌍을 final 내림차순으로 정렬한다.</td></tr>
+      <tr><td class="ctr">2</td><td>가장 높은 쌍 (A, B)를 확정 짝으로 넣는다.</td></tr>
+      <tr><td class="ctr">3</td><td>A 또는 B가 들어 있는 나머지 쌍을 목록에서 지운다.</td></tr>
+      <tr><td class="ctr">4</td><td>목록이 빌 때까지 2~3을 반복한다.</td></tr>
+      <tr><td class="ctr">5</td><td>짝이 없는 사람(인원 불균형)은 미매칭으로 남긴다.</td></tr>
+    </tbody>
+  </table>
+  <p class="muted">총학에 넘기는 산출물은 전체 1~N위가 아니라 확정 짝, 각 짝의 점수와 이유, 미매칭 명단이다. 이유는 TAG 교집합 키워드를 그대로 적으면 된다.</p>
+
+  <h2>5. 수치 예시</h2>
+  <p class="sub">A = ENFP, want = 귀여운·다정한·유머러스한, have = 활발한·다정한. B = INFJ, want = 활발한·다정한, have = 귀여운·다정한·단아한. EX는 둘 다 비어 있다고 가정.</p>
+  <div class="pair">
+    <div class="card">
+      <h3>A · ENFP</h3>
+      <p>want &nbsp;귀여운, 다정한, 유머러스한</p>
+      <p>have &nbsp;활발한, 다정한</p>
+      <p class="muted">ex_have / ex_want  없음</p>
+    </div>
+    <div class="card">
+      <h3>B · INFJ</h3>
+      <p>want &nbsp;활발한, 다정한</p>
+      <p>have &nbsp;귀여운, 다정한, 단아한</p>
+      <p class="muted">ex_have / ex_want  없음</p>
+    </div>
+  </div>
+  <table>
+    <thead>
+      <tr><th>항</th><th>계산</th><th class="num">값</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>a  A→B</td><td>|귀여운, 다정한| / 3</td><td class="num">0.667</td></tr>
+      <tr><td>b  B→A</td><td>|활발한, 다정한| / 2</td><td class="num">1.000</td></tr>
+      <tr class="info"><td>TAG</td><td>2ab / (a+b)</td><td class="num">0.800</td></tr>
+      <tr><td>MBTI</td><td>E/I 다름, N/S 같음, T/F 같음, J/P 다름 → 4/4</td><td class="num">1.000</td></tr>
+      <tr class="warn"><td>EX</td><td>양쪽 빈칸 → 결측, 항 삭제</td><td class="num">—</td></tr>
+      <tr class="ok"><td>final  1:6:3</td><td>0.143·1 + 0.857·0.800</td><td class="num">0.829</td></tr>
+      <tr><td>final  2:5:3</td><td>0.286·1 + 0.714·0.800</td><td class="num">0.857</td></tr>
+    </tbody>
+  </table>
+</body>
+</html>

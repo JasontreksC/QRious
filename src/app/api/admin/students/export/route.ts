@@ -31,6 +31,7 @@ export async function GET(req: NextRequest) {
     sheet.columns = [
       { header: '학번', key: 'student_id', width: 14 },
       { header: '이름', key: 'name', width: 12 },
+      { header: '전화번호', key: 'phone', width: 16 },
       { header: '성별', key: 'gender', width: 8 },
       { header: '나이', key: 'age', width: 8 },
       { header: 'MBTI', key: 'mbti', width: 10 },
@@ -38,6 +39,9 @@ export async function GET(req: NextRequest) {
       { header: '이상형', key: 'want', width: 40 },
       { header: '기타 매력', key: 'ex_have', width: 40 },
       { header: '기타 이상형', key: 'ex_want', width: 40 },
+      { header: '동의 여부', key: 'consent_agreed', width: 12 },
+      { header: '동의 시각', key: 'consented_at', width: 22 },
+      { header: '동의문 버전', key: 'consent_version', width: 16 },
     ];
 
     sheet.getRow(1).font = { bold: true };
@@ -46,6 +50,7 @@ export async function GET(req: NextRequest) {
       sheet.addRow({
         student_id: s.student_id,
         name: s.name,
+        phone: s.phone,
         gender: s.gender ? '여자' : '남자',
         age: s.age ?? '',
         mbti: s.mbti,
@@ -53,6 +58,9 @@ export async function GET(req: NextRequest) {
         want: s.want.join(', '),
         ex_have: s.ex_have ?? '',
         ex_want: s.ex_want ?? '',
+        consent_agreed: s.consent_agreed === true ? '동의' : '미확인',
+        consented_at: s.consented_at ?? '',
+        consent_version: s.consent_version ?? '',
       });
     }
 
