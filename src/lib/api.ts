@@ -89,6 +89,38 @@ export type SurveyResponse = {
   student_id: string;
 };
 
+export type OwnSurvey = {
+  student_id: string;
+  name: string;
+  phone: string;
+  gender: boolean;
+  age: number;
+  mbti: string;
+  major_id: string;
+  major: string;
+  age_pref_ids: string[];
+  age_prefs: string[];
+  have_charm_ids: string[];
+  have: string[];
+  want_charm_ids: string[];
+  want: string[];
+  ex_have: string | null;
+  ex_want: string | null;
+};
+
+export type SurveyPatch = {
+  phone?: string;
+  gender?: boolean;
+  age?: number;
+  major_id?: string;
+  mbti?: string;
+  age_pref_ids?: string[];
+  have_charm_ids?: string[];
+  want_charm_ids?: string[];
+  ex_have?: string | null;
+  ex_want?: string | null;
+};
+
 export async function getMajors(): Promise<Major[]> {
   const data = await request<{ majors: Major[] }>('/api/majors');
   return data.majors ?? [];
@@ -108,6 +140,17 @@ export async function submitSurvey(
 ): Promise<SurveyResponse> {
   return request<SurveyResponse>('/api/surveys', {
     method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function getMySurvey(): Promise<OwnSurvey> {
+  return request<OwnSurvey>('/api/surveys');
+}
+
+export async function patchSurvey(payload: SurveyPatch): Promise<OwnSurvey> {
+  return request<OwnSurvey>('/api/surveys', {
+    method: 'PATCH',
     body: JSON.stringify(payload),
   });
 }

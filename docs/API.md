@@ -101,7 +101,7 @@ OAuth 콜백이 실패하면 JSON 대신 홈으로 리다이렉트하며 `?error
 | 테이블 | 역할 | API |
 |--------|------|-----|
 | `google_user` | 학교 구글 계정 (`google_sub` PK) | `GET /api/auth/google` 콜백 upsert |
-| `student` | 신청자 기본 정보 + `google_sub`/`email`/`major_id` | `POST /api/surveys` |
+| `student` | 신청자 기본 정보 + `google_sub`/`email`/`major_id` | `POST`/`GET`/`PATCH`/`DELETE /api/surveys` |
 | `major` | 학과 마스터 (정식명·약칭) | `GET /api/majors` |
 | `charm` | 매력 태그 마스터 | `GET /api/charms` |
 | `have` | 내가 가진 매력 | `have_charm_ids[]` |
@@ -152,7 +152,7 @@ OAuth 콜백이 실패하면 JSON 대신 홈으로 리다이렉트하며 `?error
 
 ## 2. GET `/api/stats`
 
-`student.gender` 기준 집계, 접수된 학과 수(`major_count`), 학과별 접수 TOP 7 (`majors`, 건수 내림차순).
+`student.gender` 기준 집계, 접수된 학과 수(`major_count`), 학과별 접수 TOP 10 (`majors`, 건수 내림차순).
 
 ### Response `200 OK`
 
@@ -191,7 +191,8 @@ OAuth 콜백이 실패하면 JSON 대신 홈으로 리다이렉트하며 `?error
 ## 4. POST `/api/surveys`
 
 `qrious_google` 세션이 없으면 `401 UNAUTHORIZED`입니다.  
-이름은 세션의 구글 표시 이름에서 `성함(학생)`만 파싱해 저장합니다. `student_id`는 서버 UUID입니다.
+이름은 세션의 구글 표시 이름에서 `성함(학생)`만 파싱해 저장합니다. `student_id`는 서버 UUID입니다.  
+접수 마감은 **2026-10-15 00:00 KST**이며, 이후 POST/PATCH/DELETE는 `403 DEADLINE`입니다.
 
 ### Request body
 
@@ -225,6 +226,43 @@ OAuth 콜백이 실패하면 JSON 대신 홈으로 리다이렉트하며 `?error
 ```
 
 구현: [`src/app/api/surveys/route.ts`](../src/app/api/surveys/route.ts)
+
+---
+
+## 4b. GET `/api/surveys`
+
+로그인한 본인의 접수 내용을 반환합니다. 접수 전이면 `404 NOT_FOUND`.
+
+### Response `200 OK`
+
+```json
+{
+  "student_id": "550e8400-e29b-41d4-a716-446655440000",
+  "name": "우재성",
+  "phone": "010-1234-5678",
+  "gender": false,
+  "age": 22,
+  "mbti": "INTJ",
+  "major_id": "computer-software",
+  "major": "컴퓨터소프트웨어과",
+  "age_pref_ids": ["same"],
+  "age_prefs": ["동갑"],
+  "have_charm_ids": ["550e8400-e29b-41d4-a716-446655440000"],
+  "have": ["유머러스한"],
+  "want_charm_ids": ["550e8400-e29b-41d4-a716-446655440001"],
+  "want": ["다정한"],
+  "ex_have": "요리 잘해요",
+  "ex_want": null
+}
+```
+
+## 4c. PATCH `/api/surveys`
+
+본인 접수의 일부 필드만 수정합니다. 보낸 키만 갱신합니다.
+
+허용 키: `phone`, `gender`, `age`, `major_id`, `mbti`, `age_pref_ids`, `have_charm_ids`, `want_charm_ids`, `ex_have`, `ex_want`.
+
+이름은 구글 계정에서 오기 때문에 수정할 수 없습니다. 성공 시 GET과 같은 본문을 반환합니다.
 
 `DELETE /api/surveys`는 같은 구글 세션의 접수를 취소합니다 (`google_sub`로 `student` 삭제, consent는 유지).
 
@@ -260,6 +298,8 @@ UI: [`src/app/admin/students/page.tsx`](../src/app/admin/students/page.tsx), [`s
 | 페이지 로드 | GET | `/api/majors` |
 | 페이지 로드 | GET | `/api/stats` |
 | 제출 | POST | `/api/surveys` |
+| 내 접수 조회 | GET | `/api/surveys` |
+| 내 접수 수정 | PATCH | `/api/surveys` |
 | 접수 취소 | DELETE | `/api/surveys` |
 | 로그아웃 | POST | `/api/auth/logout` |
 

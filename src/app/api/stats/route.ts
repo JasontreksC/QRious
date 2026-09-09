@@ -26,7 +26,7 @@ export async function GET() {
       JOIN major m ON m.major_id = s.major_id
       GROUP BY m.major_id, m.name, m.short_name
       ORDER BY count DESC, m.name ASC
-      LIMIT 7
+      LIMIT 10
     `;
 
     const row = rows[0] ?? { total: 0, male: 0, female: 0, major_count: 0 };

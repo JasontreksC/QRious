@@ -21,7 +21,6 @@ import {
   CONSENT_ENTRUSTMENT,
   CONSENT_ITEMS,
   CONSENT_OPTIONAL_ITEMS,
-  CONSENT_PROCESSOR,
   CONSENT_PURPOSE,
   CONSENT_REFUSAL,
   CONSENT_RETENTION,
@@ -44,6 +43,9 @@ import {
 } from '@/lib/age-pref';
 import { parseStudentDisplayName } from '@/lib/student-name';
 import { StatsBoard } from './stats-board';
+import { DeadlineCountdown, SurveyClosedPage, useSurveyOpen } from './deadline-countdown';
+import { SubmittedSurvey } from './submitted-survey';
+import { isSurveyOpen } from '@/lib/deadline';
 
 const MBTI_OPTIONS = [
   'ISTJ', 'ISFJ', 'INFJ', 'INTJ',
@@ -112,7 +114,6 @@ type FormData = {
   exHave: string;
   exWant: string;
   consent: boolean;
-  thirdPartyConsent: boolean;
 };
 
 type FieldKey =
@@ -125,8 +126,7 @@ type FieldKey =
   | 'mbti'
   | 'haveCharmIds'
   | 'wantCharmIds'
-  | 'consent'
-  | 'thirdPartyConsent';
+  | 'consent';
 
 const initialFormData: FormData = {
   name: '',
@@ -141,7 +141,6 @@ const initialFormData: FormData = {
   exHave: '',
   exWant: '',
   consent: false,
-  thirdPartyConsent: false,
 };
 
 export default function Home() {
@@ -160,7 +159,6 @@ export default function Home() {
     haveCharmIds: false,
     wantCharmIds: false,
     consent: false,
-    thirdPartyConsent: false,
   });
 
   const [errors, setErrors] = useState<Record<FieldKey, string>>({
@@ -174,7 +172,6 @@ export default function Home() {
     haveCharmIds: '',
     wantCharmIds: '',
     consent: '',
-    thirdPartyConsent: '',
   });
 
   const [charms, setCharms] = useState<Charm[]>([]);
@@ -203,6 +200,8 @@ export default function Home() {
   const [authLoading, setAuthLoading] = useState(true);
   const [loggingOut, setLoggingOut] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false);
+  const surveyOpen = useSurveyOpen();
 
   const triggerToast = (msg: string) => {
     setToastMessage(msg);
@@ -370,10 +369,8 @@ export default function Home() {
           return '이상형 매력을 하나 이상 선택해 주세요.';
         return '';
       case 'consent':
-        if (value !== true) return '개인정보 수집·이용에 동의해 주세요.';
-        return '';
-      case 'thirdPartyConsent':
-        if (value !== true) return '개인정보 제3자 제공에 동의해 주세요.';
+        if (value !== true)
+          return '개인정보 수집·이용 및 제3자 제공에 동의해 주세요.';
         return '';
       default:
         return '';
@@ -484,7 +481,6 @@ export default function Home() {
       'haveCharmIds',
       'wantCharmIds',
       'consent',
-      'thirdPartyConsent',
     ];
 
     setTouched({
@@ -498,7 +494,6 @@ export default function Home() {
       haveCharmIds: true,
       wantCharmIds: true,
       consent: true,
-      thirdPartyConsent: true,
     });
 
     const newErrors = {
@@ -512,10 +507,6 @@ export default function Home() {
       haveCharmIds: validateField('haveCharmIds', formData.haveCharmIds),
       wantCharmIds: validateField('wantCharmIds', formData.wantCharmIds),
       consent: validateField('consent', formData.consent),
-      thirdPartyConsent: validateField(
-        'thirdPartyConsent',
-        formData.thirdPartyConsent
-      ),
     };
 
     setErrors(newErrors);
@@ -529,6 +520,11 @@ export default function Home() {
         el?.focus();
         el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
+      return;
+    }
+
+    if (!isSurveyOpen()) {
+      triggerToast('⚠️ 접수가 마감되었습니다.');
       return;
     }
 
@@ -598,10 +594,12 @@ export default function Home() {
     }
   };
 
-  const handleCancelSurvey = async () => {
-    if (!window.confirm('접수를 취소할까요? 입력한 내용은 삭제됩니다.')) {
-      return;
-    }
+  const handleCancelSurvey = () => {
+    setCancelConfirmOpen(true);
+  };
+
+  const confirmCancelSurvey = async () => {
+    setCancelConfirmOpen(false);
     setCancelling(true);
     try {
       await cancelSurvey();
@@ -700,29 +698,34 @@ export default function Home() {
 
         {/* Statistics Board */}
         <StatsBoard stats={stats} loading={!isMounted} />
+        <DeadlineCountdown />
 
-        <div className="text-center mb-8">
-          <p className="text-sm text-[#8C7A8E] mt-1.5 leading-relaxed">
-            {googleSession?.authenticated ? (
-              <>
-                아래 정보를 입력해 주세요.
-                <br />
-                매칭에만 사용하고, 이벤트가 끝나는 즉시 폐기해요.
-              </>
-            ) : (
-              <>
-                연성대학교 구글 계정(@yeonsung.ac.kr)으로
-                <br />
-                로그인한 뒤 사전 접수를 진행해 주세요.
-              </>
-            )}
-          </p>
-        </div>
+        {!submitted && surveyOpen && (
+          <div className="text-center mb-8">
+            <p className="text-sm text-[#8C7A8E] mt-1.5 leading-relaxed">
+              {googleSession?.authenticated ? (
+                <>
+                  아래 정보를 입력해 주세요.
+                  <br />
+                  매칭에만 사용하고, 이벤트가 끝나는 즉시 폐기해요.
+                </>
+              ) : (
+                <>
+                  연성대학교 구글 계정(@yeonsung.ac.kr)으로
+                  <br />
+                  로그인한 뒤 사전 접수를 진행해 주세요.
+                </>
+              )}
+            </p>
+          </div>
+        )}
 
-        {authLoading ? (
+        {authLoading && surveyOpen ? (
           <div className="bg-white border border-[#F0D9DF] rounded-2xl p-6 shadow-sm h-[180px] animate-pulse flex flex-col items-center justify-center text-xs text-[#8C7A8E] gap-2">
             <span>로그인 상태를 확인하는 중…</span>
           </div>
+        ) : !surveyOpen ? (
+          <SurveyClosedPage />
         ) : !googleSession?.authenticated ? (
           <div className="bg-white border border-[#F0D9DF] rounded-2xl p-6 shadow-sm text-center">
             <p className="text-sm text-[#8C7A8E] leading-relaxed mb-5">
@@ -759,46 +762,56 @@ export default function Home() {
             </a>
           </div>
         ) : submitted ? (
-          <div className="text-center py-10 bg-white border border-[#F0D9DF] rounded-2xl p-6 shadow-sm">
-            {googleSession.authenticated && (
-              <div className="mb-6 flex items-center gap-3 rounded-xl bg-[#FDE8EC] border border-[#F0D9DF] px-3 py-2.5 text-left">
-                {googleSession.picture ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={googleSession.picture}
-                    alt=""
-                    width={36}
-                    height={36}
-                    className="h-9 w-9 rounded-full object-cover bg-white"
-                    referrerPolicy="no-referrer"
-                  />
-                ) : (
-                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-sm font-bold text-[#E8526A]">
-                    {parseStudentDisplayName(googleSession.name)?.slice(0, 1) ||
-                      googleSession.name.slice(0, 1)}
-                  </span>
-                )}
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold text-[#2B1B2E]">
-                    {googleSession.name}
-                  </p>
-                  <p className="truncate text-xs text-[#8C7A8E]">
-                    {googleSession.email}
-                  </p>
+          <div>
+            <div className="text-center py-10 bg-white border border-[#F0D9DF] rounded-2xl p-6 shadow-sm">
+              {googleSession.authenticated && (
+                <div className="mb-6 flex items-center gap-3 rounded-xl bg-[#FDE8EC] border border-[#F0D9DF] px-3 py-2.5 text-left">
+                  {googleSession.picture ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={googleSession.picture}
+                      alt=""
+                      width={36}
+                      height={36}
+                      className="h-9 w-9 rounded-full object-cover bg-white"
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : (
+                    <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-sm font-bold text-[#E8526A]">
+                      {parseStudentDisplayName(googleSession.name)?.slice(0, 1) ||
+                        googleSession.name.slice(0, 1)}
+                    </span>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold text-[#2B1B2E]">
+                      {googleSession.name}
+                    </p>
+                    <p className="truncate text-xs text-[#8C7A8E]">
+                      {googleSession.email}
+                    </p>
+                  </div>
                 </div>
-              </div>
-            )}
-            <div className="text-[60px]">🎉</div>
-            <h2 className="text-[22px] font-bold text-[#E8526A] mt-4">접수 완료</h2>
-            <p className="text-[15px] text-[#8C7A8E] mt-2 leading-relaxed">
-              이미 사전조사가 접수된 상태예요.
-              <br />곧 좋은 인연을 연결해 드릴게요.
-            </p>
+              )}
+              <div className="text-[60px]">🎉</div>
+              <h2 className="text-[22px] font-bold text-[#E8526A] mt-4">접수 완료</h2>
+              <p className="text-[15px] text-[#8C7A8E] mt-2 leading-relaxed">
+                이미 사전조사가 접수된 상태예요.
+                <br />곧 좋은 인연을 연결해 드릴게요.
+              </p>
+              <SubmittedSurvey
+                majors={majors}
+                charms={charms}
+                charmsLoading={charmsLoading}
+                editable={surveyOpen}
+                onToast={triggerToast}
+                onSaved={fetchStats}
+              />
+            </div>
             <button
               type="button"
               onClick={handleCancelSurvey}
               disabled={cancelling}
-              className="mt-6 w-full min-h-[48px] rounded-xl border border-[#F0D9DF] bg-white px-4 py-3 text-sm font-semibold text-[#8C7A8E] hover:bg-[#FDE8EC] hover:text-[#E8526A] disabled:opacity-50"
+              className="mt-4 mx-auto block bg-transparent p-2 text-[13px] text-[#B5A3B0] hover:text-[#8C7A8E] disabled:opacity-50"
             >
               {cancelling ? '취소 중…' : '접수 취소'}
             </button>
@@ -1379,90 +1392,154 @@ export default function Home() {
                   </div>
                 </div>
               </div>
-              {/* Privacy consent */}
+              {/* Privacy consents */}
               <div className="flex flex-col gap-2" id="consent" tabIndex={-1}>
                 <h3 className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-base font-bold text-[#2B1B2E]">
                   <span>
-                    {CONSENT_TITLE}
+                    개인정보 수집·이용 및 제3자 제공 동의
                     <span className="text-[#E8526A]">*</span>
-                  </span>
-                  <span className="text-[10px] font-normal text-[#8C7A8E] leading-relaxed">
-                    매칭 완료 후 안내 문자를 발송드려요.
                   </span>
                 </h3>
                 <p className="text-[11px] text-[#8C7A8E] leading-relaxed">
-                  개인정보처리자: {CONSENT_PROCESSOR} · 동의문 버전 {CONSENT_VERSION}
+                  매칭 안내 문자 발송과, 매칭된 상대에게 연락처 전달에 사용해요.
                 </p>
+
+                <div className="rounded-xl border border-[#F0D9DF] bg-[#FDE8EC]/40 px-3 py-3 space-y-2">
+                  <div className="flex items-start justify-between gap-3">
+                    <p className="text-[12px] font-semibold text-[#2B1B2E] leading-snug">
+                      {CONSENT_TITLE}
+                      <span className="block text-[11px] font-normal text-[#8C7A8E] mt-0.5">
+                        버전 {CONSENT_VERSION}
+                      </span>
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setConsentOpen((open) => !open)}
+                      aria-expanded={consentOpen}
+                      className="shrink-0 text-sm font-semibold text-[#E8526A] underline underline-offset-2 decoration-[#E8526A]/50 hover:decoration-[#E8526A]"
+                    >
+                      {consentOpen ? '전문 닫기' : '전문 보기'}
+                    </button>
+                  </div>
+                  {consentOpen && (
+                    <div className="max-h-56 overflow-y-auto rounded-lg border border-[#F0D9DF] bg-white px-3 py-3 text-[12px] leading-relaxed text-[#2B1B2E] space-y-2.5">
+                      <p>
+                        QRious는 「개인정보 보호법」 제15조에 따라 아래 사항을 알리고
+                        동의를 받습니다.
+                      </p>
+                      <p>
+                        <span className="font-bold">수집·이용 목적</span>
+                        <br />
+                        {CONSENT_PURPOSE}
+                      </p>
+                      <p>
+                        <span className="font-bold">수집 항목</span>
+                        <br />
+                        필수: {CONSENT_ITEMS}
+                        <br />
+                        선택: {CONSENT_OPTIONAL_ITEMS}
+                      </p>
+                      <p>
+                        <span className="font-bold underline decoration-[#E8526A] underline-offset-2">
+                          보유 및 이용 기간
+                        </span>
+                        <br />
+                        {CONSENT_RETENTION}
+                      </p>
+                      <p>
+                        <span className="font-bold">동의 거부 권리 및 불이익</span>
+                        <br />
+                        {CONSENT_REFUSAL}
+                      </p>
+                      <p>
+                        <span className="font-bold">제3자 제공</span>
+                        <br />
+                        {CONSENT_THIRD_PARTY_NOTE}
+                      </p>
+                      <p>
+                        <span className="font-bold">처리 위탁</span>
+                        <br />
+                        {CONSENT_ENTRUSTMENT}
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="flex items-start justify-between gap-3 pt-2 border-t border-[#F0D9DF]/80">
+                    <p className="text-[12px] font-semibold text-[#2B1B2E] leading-snug">
+                      {THIRD_PARTY_CONSENT_TITLE}
+                      <span className="block text-[11px] font-normal text-[#8C7A8E] mt-0.5">
+                        버전 {THIRD_PARTY_CONSENT_VERSION}
+                      </span>
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setThirdPartyConsentOpen((open) => !open)}
+                      aria-expanded={thirdPartyConsentOpen}
+                      className="shrink-0 text-sm font-semibold text-[#E8526A] underline underline-offset-2 decoration-[#E8526A]/50 hover:decoration-[#E8526A]"
+                    >
+                      {thirdPartyConsentOpen ? '전문 닫기' : '전문 보기'}
+                    </button>
+                  </div>
+                  {thirdPartyConsentOpen && (
+                    <div className="max-h-56 overflow-y-auto rounded-lg border border-[#F0D9DF] bg-white px-3 py-3 text-[12px] leading-relaxed text-[#2B1B2E] space-y-2.5">
+                      <p>
+                        QRious는 「개인정보 보호법」 제17조에 따라 아래 사항을 알리고
+                        동의를 받습니다.
+                      </p>
+                      <p>
+                        <span className="font-bold">제공받는 자</span>
+                        <br />
+                        {THIRD_PARTY_RECIPIENT}
+                      </p>
+                      <p>
+                        <span className="font-bold">제공받는 자의 이용 목적</span>
+                        <br />
+                        {THIRD_PARTY_PURPOSE}
+                      </p>
+                      <p>
+                        <span className="font-bold">제공하는 개인정보 항목</span>
+                        <br />
+                        필수: {THIRD_PARTY_ITEMS}
+                        <br />
+                        선택: {THIRD_PARTY_OPTIONAL_ITEMS}
+                      </p>
+                      <p>
+                        <span className="font-bold underline decoration-[#E8526A] underline-offset-2">
+                          제공받는 자의 보유 및 이용 기간
+                        </span>
+                        <br />
+                        {THIRD_PARTY_RETENTION}
+                      </p>
+                      <p>
+                        <span className="font-bold">동의 거부 권리 및 불이익</span>
+                        <br />
+                        {THIRD_PARTY_REFUSAL}
+                      </p>
+                    </div>
+                  )}
+                </div>
+
                 <button
                   type="button"
-                  onClick={() => setConsentOpen((open) => !open)}
-                  aria-expanded={consentOpen}
-                  className="self-start text-sm font-semibold text-[#E8526A] underline underline-offset-2 decoration-[#E8526A]/50 hover:decoration-[#E8526A]"
+                  onClick={() => {
+                    const next = !formData.consent;
+                    setFormData((prev) => ({ ...prev, consent: next }));
+                    setTouched((prev) => ({ ...prev, consent: true }));
+                    setErrors((prev) => ({
+                      ...prev,
+                      consent: validateField('consent', next),
+                    }));
+                  }}
+                  className={`w-full min-h-[48px] py-3 px-4 rounded-xl border text-[15px] font-semibold transition-all duration-200 ${
+                    formData.consent
+                      ? 'bg-[#E8526A] text-white border-[#E8526A] shadow-sm'
+                      : 'bg-[#FDE8EC] text-[#2B1B2E] border-[#F0D9DF] hover:bg-[#fcdde3]'
+                  }`}
                 >
-                  {consentOpen ? '전문 닫기' : '전문 보기'}
+                  {formData.consent
+                    ? '✓ 모두 동의했습니다'
+                    : '모두 동의합니다 (필수)'}
                 </button>
-                {consentOpen && (
-                  <div className="max-h-56 overflow-y-auto rounded-xl border border-[#F0D9DF] bg-[#FDE8EC]/50 px-3 py-3 text-[12px] leading-relaxed text-[#2B1B2E] space-y-2.5">
-                    <p>
-                      QRious는 「개인정보 보호법」 제15조에 따라 아래 사항을 알리고
-                      동의를 받습니다.
-                    </p>
-                    <p>
-                      <span className="font-bold">수집·이용 목적</span>
-                      <br />
-                      {CONSENT_PURPOSE}
-                    </p>
-                    <p>
-                      <span className="font-bold">수집 항목</span>
-                      <br />
-                      필수: {CONSENT_ITEMS}
-                      <br />
-                      선택: {CONSENT_OPTIONAL_ITEMS}
-                    </p>
-                    <p>
-                      <span className="font-bold underline decoration-[#E8526A] underline-offset-2">
-                        보유 및 이용 기간
-                      </span>
-                      <br />
-                      {CONSENT_RETENTION}
-                    </p>
-                    <p>
-                      <span className="font-bold">동의 거부 권리 및 불이익</span>
-                      <br />
-                      {CONSENT_REFUSAL}
-                    </p>
-                    <p>
-                      <span className="font-bold">제3자 제공</span>
-                      <br />
-                      {CONSENT_THIRD_PARTY_NOTE}
-                    </p>
-                    <p>
-                      <span className="font-bold">처리 위탁</span>
-                      <br />
-                      {CONSENT_ENTRUSTMENT}
-                    </p>
-                  </div>
-                )}
-                <label className="flex items-start gap-2.5 text-sm leading-relaxed cursor-pointer">
-                  <input
-                    id="consent-checkbox"
-                    type="checkbox"
-                    checked={formData.consent}
-                    onChange={(e) => {
-                      const next = e.target.checked;
-                      setFormData((prev) => ({ ...prev, consent: next }));
-                      setTouched((prev) => ({ ...prev, consent: true }));
-                      setErrors((prev) => ({
-                        ...prev,
-                        consent: validateField('consent', next),
-                      }));
-                    }}
-                    className="mt-1 h-4 w-4 shrink-0 accent-[#E8526A]"
-                  />
-                  <span>
-                    개인정보 수집·이용 내용을 확인했으며 이에 동의합니다. (필수)
-                  </span>
-                </label>
                 <p
                   className={`text-xs leading-relaxed ${
                     touched.consent && errors.consent
@@ -1472,113 +1549,7 @@ export default function Home() {
                 >
                   {touched.consent && errors.consent
                     ? errors.consent
-                    : `전문은 저장 시 버전 ${CONSENT_VERSION}으로 기록됩니다.`}
-                </p>
-              </div>
-
-              {/* Third-party provision consent */}
-              <div
-                className="flex flex-col gap-2"
-                id="thirdPartyConsent"
-                tabIndex={-1}
-              >
-                <h3 className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-base font-bold text-[#2B1B2E]">
-                  <span>
-                    {THIRD_PARTY_CONSENT_TITLE}
-                    <span className="text-[#E8526A]">*</span>
-                  </span>
-                  <span className="text-[10px] font-normal text-[#8C7A8E] leading-relaxed">
-                    매칭된 상대방에게 연락처를 전달드려요.
-                  </span>
-                </h3>
-                <p className="text-[11px] text-[#8C7A8E] leading-relaxed">
-                  개인정보처리자: {CONSENT_PROCESSOR} · 동의문 버전{' '}
-                  {THIRD_PARTY_CONSENT_VERSION}
-                </p>
-                <button
-                  type="button"
-                  onClick={() => setThirdPartyConsentOpen((open) => !open)}
-                  aria-expanded={thirdPartyConsentOpen}
-                  className="self-start text-sm font-semibold text-[#E8526A] underline underline-offset-2 decoration-[#E8526A]/50 hover:decoration-[#E8526A]"
-                >
-                  {thirdPartyConsentOpen ? '전문 닫기' : '전문 보기'}
-                </button>
-                {thirdPartyConsentOpen && (
-                  <div className="max-h-56 overflow-y-auto rounded-xl border border-[#F0D9DF] bg-[#FDE8EC]/50 px-3 py-3 text-[12px] leading-relaxed text-[#2B1B2E] space-y-2.5">
-                    <p>
-                      QRious는 「개인정보 보호법」 제17조에 따라 아래 사항을 알리고
-                      동의를 받습니다.
-                    </p>
-                    <p>
-                      <span className="font-bold">제공받는 자</span>
-                      <br />
-                      {THIRD_PARTY_RECIPIENT}
-                    </p>
-                    <p>
-                      <span className="font-bold">제공받는 자의 이용 목적</span>
-                      <br />
-                      {THIRD_PARTY_PURPOSE}
-                    </p>
-                    <p>
-                      <span className="font-bold">제공하는 개인정보 항목</span>
-                      <br />
-                      필수: {THIRD_PARTY_ITEMS}
-                      <br />
-                      선택: {THIRD_PARTY_OPTIONAL_ITEMS}
-                    </p>
-                    <p>
-                      <span className="font-bold underline decoration-[#E8526A] underline-offset-2">
-                        제공받는 자의 보유 및 이용 기간
-                      </span>
-                      <br />
-                      {THIRD_PARTY_RETENTION}
-                    </p>
-                    <p>
-                      <span className="font-bold">동의 거부 권리 및 불이익</span>
-                      <br />
-                      {THIRD_PARTY_REFUSAL}
-                    </p>
-                  </div>
-                )}
-                <label className="flex items-start gap-2.5 text-sm leading-relaxed cursor-pointer">
-                  <input
-                    id="third-party-consent-checkbox"
-                    type="checkbox"
-                    checked={formData.thirdPartyConsent}
-                    onChange={(e) => {
-                      const next = e.target.checked;
-                      setFormData((prev) => ({
-                        ...prev,
-                        thirdPartyConsent: next,
-                      }));
-                      setTouched((prev) => ({
-                        ...prev,
-                        thirdPartyConsent: true,
-                      }));
-                      setErrors((prev) => ({
-                        ...prev,
-                        thirdPartyConsent: validateField(
-                          'thirdPartyConsent',
-                          next
-                        ),
-                      }));
-                    }}
-                    className="mt-1 h-4 w-4 shrink-0 accent-[#E8526A]"
-                  />
-                  <span>
-                    개인정보 제3자 제공 내용을 확인했으며 이에 동의합니다. (필수)
-                  </span>
-                </label>
-                <p
-                  className={`text-xs leading-relaxed ${
-                    touched.thirdPartyConsent && errors.thirdPartyConsent
-                      ? 'text-[#E8526A]'
-                      : 'text-[#8C7A8E]'
-                  }`}
-                >
-                  {touched.thirdPartyConsent && errors.thirdPartyConsent
-                    ? errors.thirdPartyConsent
-                    : `전문은 저장 시 버전 ${THIRD_PARTY_CONSENT_VERSION}으로 기록됩니다.`}
+                    : `저장 시 수집·이용(${CONSENT_VERSION})과 제3자 제공(${THIRD_PARTY_CONSENT_VERSION}) 동의가 함께 기록됩니다.`}
                 </p>
               </div>
             </form>
@@ -1587,7 +1558,7 @@ export default function Home() {
       </div>
 
       {/* Floating Submit Bar */}
-      {!submitted && googleSession?.authenticated && (
+      {!submitted && googleSession?.authenticated && surveyOpen && (
         <div className="fixed bottom-0 left-0 right-0 bg-[#FBF6F0]/92 backdrop-blur-md border-t border-[#F0D9DF] px-4 py-3 z-50 pb-[calc(12px+env(safe-area-inset-bottom))]">
           <button
             type="button"
@@ -1604,6 +1575,40 @@ export default function Home() {
               '💌 제출하기'
             )}
           </button>
+        </div>
+      )}
+
+      {cancelConfirmOpen && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-[#2B1B2E]/40 px-6">
+          <div
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="cancel-survey-title"
+            className="w-full max-w-[320px] rounded-2xl bg-white p-5 text-center shadow-lg"
+          >
+            <p id="cancel-survey-title" className="text-base font-bold text-[#2B1B2E]">
+              접수를 취소할까요?
+            </p>
+            <p className="mt-2 text-sm text-[#8C7A8E] leading-relaxed">
+              입력한 내용은 삭제됩니다.
+            </p>
+            <div className="mt-5 flex gap-2">
+              <button
+                type="button"
+                onClick={() => setCancelConfirmOpen(false)}
+                className="flex-1 min-h-[44px] rounded-xl border border-[#F0D9DF] bg-white text-sm font-semibold text-[#8C7A8E]"
+              >
+                닫기
+              </button>
+              <button
+                type="button"
+                onClick={() => void confirmCancelSurvey()}
+                className="flex-1 min-h-[44px] rounded-xl bg-[#E8526A] text-sm font-semibold text-white"
+              >
+                접수 취소
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
