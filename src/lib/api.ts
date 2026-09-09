@@ -1,3 +1,5 @@
+import type { Major } from '@/lib/majors';
+
 export class ApiError extends Error {
   status: number;
   code?: string;
@@ -49,30 +51,48 @@ export type Charm = {
   name: string;
 };
 
+export type { Major };
+
+export type MajorStat = {
+  major_id: string;
+  name: string;
+  short_name: string;
+  count: number;
+};
+
 export type SurveyStats = {
   total: number;
   male: number;
   female: number;
+  major_count: number;
+  majors: MajorStat[];
 };
 
 export type SurveyPayload = {
-  student_id: string;
-  name: string;
   phone: string;
   gender: boolean;
   age: number;
+  major_id: string;
   mbti: string;
+  age_pref_ids: string[];
   have_charm_ids: string[];
   want_charm_ids: string[];
   ex_have?: string | null;
   ex_want?: string | null;
   consent_agreed: boolean;
   consent_version: string;
+  third_party_consent_agreed: boolean;
+  third_party_consent_version: string;
 };
 
 export type SurveyResponse = {
   student_id: string;
 };
+
+export async function getMajors(): Promise<Major[]> {
+  const data = await request<{ majors: Major[] }>('/api/majors');
+  return data.majors ?? [];
+}
 
 export async function getCharms(): Promise<Charm[]> {
   const data = await request<{ charms: Charm[] }>('/api/charms');
@@ -92,6 +112,10 @@ export async function submitSurvey(
   });
 }
 
+export async function cancelSurvey(): Promise<void> {
+  await request<{ ok: boolean }>('/api/surveys', { method: 'DELETE' });
+}
+
 export type AdminStudent = {
   student_id: string;
   name: string;
@@ -99,28 +123,38 @@ export type AdminStudent = {
   gender: boolean;
   age: number | null;
   mbti: string;
+  major: string | null;
+  age_prefs: string[];
   have: string[];
   want: string[];
   ex_have: string | null;
   ex_want: string | null;
+  email: string | null;
   consent_agreed: boolean | null;
   consented_at: string | null;
   consent_version: string | null;
+  third_party_consent_agreed: boolean | null;
+  third_party_consented_at: string | null;
+  third_party_consent_version: string | null;
 };
 
-export async function getAdminSession(): Promise<{ authenticated: boolean }> {
-  return request<{ authenticated: boolean }>('/api/admin/session');
+export type GoogleAuthSession =
+  | { authenticated: false }
+  | {
+      authenticated: true;
+      email: string;
+      name: string;
+      picture: string | null;
+      submitted: boolean;
+      isAdmin: boolean;
+    };
+
+export async function getGoogleSession(): Promise<GoogleAuthSession> {
+  return request<GoogleAuthSession>('/api/auth/session', { cache: 'no-store' });
 }
 
-export async function adminLogin(password: string): Promise<void> {
-  await request<{ ok: boolean }>('/api/admin/login', {
-    method: 'POST',
-    body: JSON.stringify({ password }),
-  });
-}
-
-export async function adminLogout(): Promise<void> {
-  await request<{ ok: boolean }>('/api/admin/logout', { method: 'POST' });
+export async function logoutGoogle(): Promise<void> {
+  await request<{ ok: boolean }>('/api/auth/logout', { method: 'POST' });
 }
 
 export async function getAdminStudents(): Promise<AdminStudent[]> {

@@ -52,8 +52,9 @@ export default function AdminStudentsPage() {
     if (!q) return students;
     return students.filter(
       (s) =>
-        s.student_id.toLowerCase().includes(q) ||
-        s.name.toLowerCase().includes(q)
+        s.name.toLowerCase().includes(q) ||
+        (s.email ?? '').toLowerCase().includes(q) ||
+        (s.major ?? '').toLowerCase().includes(q)
     );
   }, [students, query]);
 
@@ -86,7 +87,7 @@ export default function AdminStudentsPage() {
   const handleDelete = async (student: AdminStudent) => {
     if (
       !window.confirm(
-        `${student.name} (${student.student_id}) 참가자를 삭제할까요?`
+        `${student.name}${student.email ? ` (${student.email})` : ''} 참가자를 삭제할까요?`
       )
     ) {
       return;
@@ -139,7 +140,7 @@ export default function AdminStudentsPage() {
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="이름 또는 학번 검색"
+            placeholder="이름, 이메일 또는 학과 검색"
             className="w-44 sm:w-56 px-3 py-2 rounded-lg border border-[#F0D9DF] bg-[#FDE8EC] text-sm outline-none placeholder-[#C9B0BE] focus:border-[#E8526A] focus:bg-white"
           />
           <button
@@ -180,8 +181,9 @@ export default function AdminStudentsPage() {
           <table className="w-full min-w-[720px] text-sm text-left">
             <thead className="sticky top-0 bg-white z-10">
               <tr className="text-xs uppercase tracking-wider text-[#8C7A8E] border-b border-[#F0D9DF]">
-                <th className="py-2 px-5 font-semibold">학번</th>
-                <th className="py-2 pr-3 font-semibold">이름</th>
+                <th className="py-2 px-5 font-semibold">이름</th>
+                <th className="py-2 pr-3 font-semibold">이메일</th>
+                <th className="py-2 pr-3 font-semibold">학과</th>
                 <th className="py-2 pr-3 font-semibold">전화번호</th>
                 <th className="py-2 pr-3 font-semibold">성별</th>
                 <th className="py-2 pr-3 font-semibold">나이</th>
@@ -195,10 +197,11 @@ export default function AdminStudentsPage() {
                 return (
                   <React.Fragment key={student.student_id}>
                     <tr className="border-b border-[#F0D9DF]/80">
-                      <td className="py-3 px-5 font-mono text-[13px]">
-                        {student.student_id}
+                      <td className="py-3 px-5">{student.name}</td>
+                      <td className="py-3 pr-3 font-mono text-[13px]">
+                        {student.email || '-'}
                       </td>
-                      <td className="py-3 pr-3">{student.name}</td>
+                      <td className="py-3 pr-3">{student.major || '-'}</td>
                       <td className="py-3 pr-3 font-mono text-[13px]">
                         {student.phone || '-'}
                       </td>
@@ -257,6 +260,29 @@ export default function AdminStudentsPage() {
                             </p>
                             <p className="text-xs leading-relaxed sm:col-span-2">
                               <span className="font-semibold text-[#8C7A8E]">
+                                학과
+                              </span>
+                              <br />
+                              {student.major || '없음'}
+                            </p>
+                            <p className="text-xs leading-relaxed sm:col-span-2">
+                              <span className="font-semibold text-[#8C7A8E]">
+                                구글 계정
+                              </span>
+                              <br />
+                              {student.email || '없음'}
+                            </p>
+                            <p className="text-xs leading-relaxed sm:col-span-2">
+                              <span className="font-semibold text-[#8C7A8E]">
+                                선호 연령
+                              </span>
+                              <br />
+                              {student.age_prefs.length > 0
+                                ? student.age_prefs.join(', ')
+                                : '없음'}
+                            </p>
+                            <p className="text-xs leading-relaxed sm:col-span-2">
+                              <span className="font-semibold text-[#8C7A8E]">
                                 개인정보 수집·이용 동의
                               </span>
                               <br />
@@ -271,6 +297,25 @@ export default function AdminStudentsPage() {
                                 : ''}
                               {student.consent_version
                                 ? ` · 버전 ${student.consent_version}`
+                                : ''}
+                            </p>
+                            <p className="text-xs leading-relaxed sm:col-span-2">
+                              <span className="font-semibold text-[#8C7A8E]">
+                                개인정보 제3자 제공 동의
+                              </span>
+                              <br />
+                              {student.third_party_consent_agreed === true
+                                ? '동의'
+                                : '미확인'}
+                              {student.third_party_consented_at
+                                ? ` · ${new Date(
+                                    student.third_party_consented_at
+                                  ).toLocaleString('ko-KR', {
+                                    timeZone: 'Asia/Seoul',
+                                  })}`
+                                : ''}
+                              {student.third_party_consent_version
+                                ? ` · 버전 ${student.third_party_consent_version}`
                                 : ''}
                             </p>
                           </div>

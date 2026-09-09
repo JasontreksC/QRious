@@ -11,15 +11,36 @@ export async function GET() {
       SELECT
         COUNT(*)::int AS total,
         COUNT(*) FILTER (WHERE gender = false)::int AS male,
-        COUNT(*) FILTER (WHERE gender = true)::int AS female
+        COUNT(*) FILTER (WHERE gender = true)::int AS female,
+        COUNT(DISTINCT major_id)::int AS major_count
       FROM student
     `;
 
-    const row = rows[0] ?? { total: 0, male: 0, female: 0 };
+    const majorRows = await sql`
+      SELECT
+        m.major_id,
+        m.name,
+        m.short_name,
+        COUNT(*)::int AS count
+      FROM student s
+      JOIN major m ON m.major_id = s.major_id
+      GROUP BY m.major_id, m.name, m.short_name
+      ORDER BY count DESC, m.name ASC
+      LIMIT 7
+    `;
+
+    const row = rows[0] ?? { total: 0, male: 0, female: 0, major_count: 0 };
     return NextResponse.json({
       total: Number(row.total) || 0,
       male: Number(row.male) || 0,
       female: Number(row.female) || 0,
+      major_count: Number(row.major_count) || 0,
+      majors: majorRows.map((item) => ({
+        major_id: String(item.major_id),
+        name: String(item.name ?? ''),
+        short_name: String(item.short_name ?? ''),
+        count: Number(item.count) || 0,
+      })),
     });
   } catch (err) {
     console.error('GET /api/stats', err);

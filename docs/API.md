@@ -1,9 +1,11 @@
 # QRious Survey API Specification
 
 Next.js Route Handlers가 Neon Postgres에 직접 연결합니다.  
-별도 백엔드 서버는 없습니다. ERD: `student`, `charm`, `have`, `want`, `ex_have`, `ex_want`, `consent_notice`, `consent`.
+별도 백엔드 서버는 없습니다. ERD: `google_user`, `student`, `major`, `charm`, `have`, `want`, `ex_have`, `ex_want`, `age_pref`, `prefer_age`, `consent_notice`, `consent`, `admin`.
 
 브라우저는 같은 origin의 `/api/*`만 호출하고, 서버만 `DATABASE_URL`로 Neon에 접속합니다.
+
+사전 접수(`POST /api/surveys`)는 연성대학교 Workspace 구글 계정(`@yeonsung.ac.kr`) 로그인 세션이 필요합니다.
 
 ---
 
@@ -13,11 +15,18 @@ Next.js Route Handlers가 Neon Postgres에 직접 연결합니다.
 
 ```
 DATABASE_URL=postgresql://USER:PASSWORD@ep-xxx-pooler.region.aws.neon.tech/neondb?sslmode=require
-ADMIN_PASSWORD=your-admin-password
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+AUTH_SECRET=
+AUTH_URL=
 ```
 
 - Neon 콘솔의 **pooled** 연결 문자열을 사용합니다.
-- `ADMIN_PASSWORD`는 `/admin` 로그인과 관리자 API 쿠키 세션에 사용합니다. `NEXT_PUBLIC_`을 붙이지 마세요.
+- `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`은 Google Cloud OAuth 2.0 **웹 클라이언트**입니다.
+- 승인된 리디렉션 URI: `{origin}/api/auth/google/callback`  
+  로컬 예: `http://localhost:3000/api/auth/google/callback`
+- `AUTH_SECRET`은 `qrious_google` 세션 쿠키 HMAC 키입니다. 32바이트 이상 무작위 문자열을 넣으세요.
+- `AUTH_URL`은 프록시/커스텀 도메인에서 OAuth `redirect_uri`를 고정할 때 사용합니다. 비우면 요청 Host / `x-forwarded-*`를 씁니다.
 
 ---
 
@@ -27,15 +36,15 @@ ADMIN_PASSWORD=your-admin-password
 |------|------|
 | Content-Type | `application/json; charset=utf-8` |
 | Accept | `application/json` |
-| 인증 | 현재 공개 사전조사 폼 — 인증 헤더 없음 |
+| 인증 | httpOnly 쿠키 `qrious_google`. 관리자 API는 같은 세션의 이메일이 `admin` 테이블에 있을 때 허용 |
 
 ### 에러 응답 형식
 
 ```json
 {
   "error": {
-    "code": "DUPLICATE_STUDENT",
-    "message": "이미 접수된 학번입니다."
+    "code": "DUPLICATE_GOOGLE",
+    "message": "이미 이 구글 계정으로 접수했습니다."
   }
 }
 ```
@@ -43,19 +52,36 @@ ADMIN_PASSWORD=your-admin-password
 | HTTP | code (예시) | 의미 |
 |------|-------------|------|
 | 400 | `VALIDATION_ERROR` | 요청 본문 검증 실패 |
-| 409 | `DUPLICATE_STUDENT` | 동일 `student_id` 이미 존재 |
+| 401 | `UNAUTHORIZED` | 구글 세션 없음 (설문 제출) 또는 관리자 미인증 |
+| 403 | `NOT_STUDENT` | 구글 표시 이름이 `성함(학생)` 형식이 아님 |
+| 409 | `DUPLICATE_GOOGLE` | 동일 구글 계정으로 이미 접수 |
 | 500 | `INTERNAL_ERROR` | 서버/DB 오류 |
-| 503 | `CONFIG_MISSING` | `DATABASE_URL` 또는 `ADMIN_PASSWORD` 미설정 |
-| 401 | `UNAUTHORIZED` / `INVALID_PASSWORD` | 관리자 인증 실패 |
+| 503 | `CONFIG_MISSING` | `DATABASE_URL` 미설정 |
+
+OAuth 콜백이 실패하면 JSON 대신 홈으로 리다이렉트하며 `?error=`를 붙입니다.
+
+| `error` | 의미 |
+|---------|------|
+| `domain` | `@yeonsung.ac.kr`이 아닌 계정 |
+| `google` | 구글 토큰 교환/상태 검증 실패 |
+| `not_student` | 구글 표시 이름이 `성함(학생)`이 아님 |
+| `config` | `GOOGLE_CLIENT_*` 또는 `AUTH_SECRET` 미설정 |
 
 ---
 
 ## 도메인 규약
 
-### `student_id` (학번)
+### `student_id`
 
-- 타입: **문자열**, 정확히 **10자리 숫자**
+- 서버가 발급하는 UUID 문자열 (폼에서 입력받지 않음)
 - Primary Key (`student.student_id`)
+- 참가자 식별은 `google_sub`로 합니다.
+
+### `major_id`
+
+- `major` 마스터 테이블 PK (영문 슬러그)
+- 정식 학과명 `name`, 차트용 약칭 `short_name` (`컴소과`, `겜콘과` 등)
+- 카탈로그: [`majors.txt`](../majors.txt), 런타임: `GET /api/majors` (가나다 정렬)
 
 ### `gender`
 
@@ -74,14 +100,19 @@ ADMIN_PASSWORD=your-admin-password
 
 | 테이블 | 역할 | API |
 |--------|------|-----|
-| `student` | 신청자 기본 정보 | `POST /api/surveys` |
+| `google_user` | 학교 구글 계정 (`google_sub` PK) | `GET /api/auth/google` 콜백 upsert |
+| `student` | 신청자 기본 정보 + `google_sub`/`email`/`major_id` | `POST /api/surveys` |
+| `major` | 학과 마스터 (정식명·약칭) | `GET /api/majors` |
 | `charm` | 매력 태그 마스터 | `GET /api/charms` |
 | `have` | 내가 가진 매력 | `have_charm_ids[]` |
 | `want` | 원하는 이상형 매력 | `want_charm_ids[]` |
 | `ex_have` | 추가 어필 텍스트 | `ex_have` (있을 때만) |
 | `ex_want` | 추가 이상형 텍스트 | `ex_want` (있을 때만) |
+| `age_pref` | 선호 연령 마스터 (상관없음/연하/동갑/연상) | 고정 4행 |
+| `prefer_age` | 신청자 ↔ 선호 연령 | `age_pref_ids[]` |
 | `consent_notice` | 버전별 동의문 원문·해시 | 제출 시 upsert (`ON CONFLICT DO NOTHING`) |
 | `consent` | 동의 증빙 (여부·시각·스냅샷) | `POST /api/surveys` |
+| `admin` | 관리자 허용 이메일 | `/admin` 및 `/api/admin/*` |
 
 ---
 
@@ -101,67 +132,117 @@ ADMIN_PASSWORD=your-admin-password
 
 ---
 
-## 2. GET `/api/stats`
+## 1b. GET `/api/majors`
 
-`student.gender` 기준 집계.
+`major` 테이블의 학과 목록. 클라이언트에서 가나다 순으로 정렬해 내려줍니다.
 
 ### Response `200 OK`
 
 ```json
-{ "total": 42, "male": 20, "female": 22 }
+{
+  "majors": [
+    { "major_id": "computer-software", "name": "컴퓨터소프트웨어과", "short_name": "컴소과" }
+  ]
+}
+```
+
+구현: [`src/app/api/majors/route.ts`](../src/app/api/majors/route.ts)
+
+---
+
+## 2. GET `/api/stats`
+
+`student.gender` 기준 집계, 접수된 학과 수(`major_count`), 학과별 접수 TOP 7 (`majors`, 건수 내림차순).
+
+### Response `200 OK`
+
+```json
+{
+  "total": 42,
+  "male": 20,
+  "female": 22,
+  "major_count": 16,
+  "majors": [
+    { "major_id": "computer-software", "name": "컴퓨터소프트웨어과", "short_name": "컴소과", "count": 8 },
+    { "major_id": "nursing", "name": "간호학과", "short_name": "간호학과", "count": 5 }
+  ]
+}
 ```
 
 구현: [`src/app/api/stats/route.ts`](../src/app/api/stats/route.ts)
 
 ---
 
-## 3. POST `/api/surveys`
+## 3. 구글 로그인
 
-트랜잭션으로 일괄 저장합니다.
+학교 Workspace 계정만 허용합니다 (`hd=yeonsung.ac.kr`, 이메일이 `@yeonsung.ac.kr`로 끝나야 함). PKCE + `openid email profile`.
+
+| 메서드 | 경로 | 설명 |
+|--------|------|------|
+| GET | `/api/auth/google` | Google 동의 화면으로 리다이렉트 |
+| GET | `/api/auth/google/callback` | 토큰 교환, `성함(학생)` 검사, `google_user` upsert, `qrious_google` 쿠키, `/`로 리다이렉트 |
+| GET | `/api/auth/session` | `{ authenticated: false }` 또는 프로필 + `submitted` + `isAdmin` |
+| POST | `/api/auth/logout` | `qrious_google` 쿠키 삭제 |
+
+구현: [`src/lib/google-auth.ts`](../src/lib/google-auth.ts), [`src/app/api/auth/`](../src/app/api/auth/)
+
+---
+
+## 4. POST `/api/surveys`
+
+`qrious_google` 세션이 없으면 `401 UNAUTHORIZED`입니다.  
+이름은 세션의 구글 표시 이름에서 `성함(학생)`만 파싱해 저장합니다. `student_id`는 서버 UUID입니다.
 
 ### Request body
 
 | 필드 | 타입 | 필수 | ERD |
 |------|------|------|-----|
-| `student_id` | string | O | `student.student_id` |
-| `name` | string | O | `student.name` |
 | `phone` | string | O | `student.phone` |
 | `gender` | boolean | O | `student.gender` |
 | `age` | integer | O | `student.age` |
+| `major_id` | string | O | `student.major_id` → `major` |
+| `age_pref_ids` | string[] | O | `prefer_age` — `['any']` 또는 `younger`/`same`/`older` 조합 |
 | `mbti` | string | O | `student.mbti` |
 | `have_charm_ids` | string[] | O | `have` |
 | `want_charm_ids` | string[] | O | `want` |
 | `ex_have` | string \| null | X | `ex_have.charm` |
 | `ex_want` | string \| null | X | `ex_want.charm` |
-| `consent_agreed` | boolean | O | `consent.agreed` — 반드시 `true` |
-| `consent_version` | string | O | 현재 서버 동의문 버전과 일치해야 함 |
+| `consent_agreed` | boolean | O | `consent.agreed` — 수집·이용, 반드시 `true` |
+| `consent_version` | string | O | 현재 수집·이용 동의문 버전과 일치해야 함 |
+| `third_party_consent_agreed` | boolean | O | `consent.agreed` — 제3자 제공, 반드시 `true` |
+| `third_party_consent_version` | string | O | 현재 제3자 제공 동의문 버전과 일치해야 함 |
 
-제출 시 서버는 현재 동의문 전문(`CONSENT_BODY`)과 SHA-256 해시를 `consent_notice` / `consent`에 함께 저장합니다. IP(`x-forwarded-for`)와 User-Agent도 기록합니다. `consent.student_id`는 `ON DELETE CASCADE`가 없어 참가자 삭제 후에도 증빙이 남습니다.
+제출 시 서버는 수집·이용 동의문과 제3자 제공 동의문 전문·SHA-256 해시를 각각 `consent_notice` / `consent`에 저장합니다. IP(`x-forwarded-for`)와 User-Agent도 기록합니다. `consent.student_id`는 `ON DELETE CASCADE`가 없어 참가자 삭제 후에도 증빙이 남습니다.
 
-현재 동의문 버전: `2026.08.31-1` (`src/lib/consent-notice.ts`)
+현재 수집·이용 동의문 버전: `2026.09.09-3`  
+현재 제3자 제공 동의문 버전: `2026.09.09-3-tp`  
+(`src/lib/consent-notice.ts`)
 
 ### Response `201 Created`
 
 ```json
-{ "student_id": "2024123456" }
+{ "student_id": "550e8400-e29b-41d4-a716-446655440000" }
 ```
 
 구현: [`src/app/api/surveys/route.ts`](../src/app/api/surveys/route.ts)
 
+`DELETE /api/surveys`는 같은 구글 세션의 접수를 취소합니다 (`google_sub`로 `student` 삭제, consent는 유지).
+
 ---
 
-## 4. 관리자 API
+## 5. 관리자 API
 
-httpOnly 쿠키 `qrious_admin`으로 인증합니다. 비밀번호는 `ADMIN_PASSWORD`와 비교합니다.
+학교 구글 세션(`qrious_google`)의 이메일이 `admin` 테이블에 있으면 별도 비밀번호 없이 허용합니다.  
+시드 계정: `jasontreks@yeonsung.ac.kr` (`migrations/20260909_create_admin.sql`).
+
+홈 화면 우측 상단 **관리자** 버튼은 로그인된 이메일이 `admin`에 있을 때만 표시됩니다.
 
 | 메서드 | 경로 | 설명 |
 |--------|------|------|
-| POST | `/api/admin/login` | `{ "password" }` → 세션 쿠키 |
-| POST | `/api/admin/logout` | 쿠키 삭제 |
-| GET | `/api/admin/session` | `{ "authenticated": true }` |
-| GET | `/api/admin/students` | 참가자 + have/want/ex + 최근 동의 여부/시각/버전 |
-| GET | `/api/admin/students/export` | 조인된 참가자 xlsx (`?q=` 이름/학번 검색, 동의 컬럼 포함) |
-| DELETE | `/api/admin/students/{studentId}` | 참가자 삭제 (have/want/ex CASCADE, **consent는 유지**) |
+| GET | `/api/admin/session` | `{ "authenticated": true }` (구글 세션 + `admin` 테이블) |
+| GET | `/api/admin/students` | 참가자 + have/want/ex + 학과 + 구글 이메일 + 수집·이용/제3자 제공 동의 |
+| GET | `/api/admin/students/export` | 조인된 참가자 xlsx (`?q=` 이름/이메일/학과 검색) |
+| DELETE | `/api/admin/students/{studentId}` | 참가자 삭제 (UUID 또는 레거시 10자리 학번, have/want/ex/prefer_age CASCADE, **consent는 유지**) |
 | POST | `/api/admin/charms` | `{ "name" }` 태그 추가 |
 | DELETE | `/api/admin/charms/{charmId}` | 태그 삭제 (have/want CASCADE) |
 
@@ -173,9 +254,14 @@ UI: [`src/app/admin/students/page.tsx`](../src/app/admin/students/page.tsx), [`s
 
 | 시점 | 메서드 | 경로 |
 |------|--------|------|
+| 페이지 로드 | GET | `/api/auth/session` |
+| 미로그인 | GET | `/api/auth/google` (브라우저 이동) |
 | 페이지 로드 | GET | `/api/charms` |
+| 페이지 로드 | GET | `/api/majors` |
 | 페이지 로드 | GET | `/api/stats` |
 | 제출 | POST | `/api/surveys` |
+| 접수 취소 | DELETE | `/api/surveys` |
+| 로그아웃 | POST | `/api/auth/logout` |
 
 - 클라이언트: [`src/lib/api.ts`](../src/lib/api.ts)
 - DB 클라이언트: [`src/lib/db.ts`](../src/lib/db.ts)
@@ -183,5 +269,5 @@ UI: [`src/app/admin/students/page.tsx`](../src/app/admin/students/page.tsx), [`s
 
 ```bash
 cp .env.local.example .env.local
-# Neon pooled DATABASE_URL 입력 후 npm run dev
+# Neon pooled DATABASE_URL, Google OAuth, AUTH_SECRET 입력 후 npm run dev
 ```

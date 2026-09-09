@@ -3,26 +3,47 @@
 import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from 'recharts';
 import {
+  cancelSurvey,
   getCharms,
+  getGoogleSession,
+  getMajors,
   getStats,
+  logoutGoogle,
   submitSurvey,
   ApiError,
   type Charm,
+  type GoogleAuthSession,
+  type Major,
+  type SurveyStats,
 } from '@/lib/api';
 import {
+  CONSENT_ENTRUSTMENT,
   CONSENT_ITEMS,
   CONSENT_OPTIONAL_ITEMS,
   CONSENT_PROCESSOR,
   CONSENT_PURPOSE,
   CONSENT_REFUSAL,
   CONSENT_RETENTION,
-  CONSENT_THIRD_PARTY,
-  CONSENT_ENTRUSTMENT,
+  CONSENT_THIRD_PARTY_NOTE,
   CONSENT_TITLE,
   CONSENT_VERSION,
+  THIRD_PARTY_CONSENT_TITLE,
+  THIRD_PARTY_CONSENT_VERSION,
+  THIRD_PARTY_ITEMS,
+  THIRD_PARTY_OPTIONAL_ITEMS,
+  THIRD_PARTY_PURPOSE,
+  THIRD_PARTY_RECIPIENT,
+  THIRD_PARTY_REFUSAL,
+  THIRD_PARTY_RETENTION,
 } from '@/lib/consent-notice';
+import {
+  AGE_PREF_ANY,
+  AGE_PREF_SPECIFIC,
+  type AgePrefSpecificId,
+} from '@/lib/age-pref';
+import { parseStudentDisplayName } from '@/lib/student-name';
+import { StatsBoard } from './stats-board';
 
 const MBTI_OPTIONS = [
   'ISTJ', 'ISFJ', 'INFJ', 'INTJ',
@@ -60,43 +81,67 @@ function isValidKrPhone(value: string): boolean {
   return /^01[016789]\d{7,8}$/.test(d);
 }
 
+function oauthErrorMessage(code: string | null): string | null {
+  if (code === 'domain') {
+    return '연성대학교 구글 계정(@yeonsung.ac.kr)만 사용할 수 있습니다.';
+  }
+  if (code === 'google') {
+    return '구글 로그인에 실패했습니다. 다시 시도해 주세요.';
+  }
+  if (code === 'config') {
+    return '구글 로그인이 아직 설정되지 않았습니다.';
+  }
+  return null;
+}
+
+type AgePrefForm = {
+  any: boolean;
+  ids: AgePrefSpecificId[];
+};
+
 type FormData = {
-  studentId: string;
   name: string;
+  major: string;
   phone: string;
   gender: boolean | null;
   age: string;
+  agePref: AgePrefForm;
   mbti: string;
   haveCharmIds: string[];
   wantCharmIds: string[];
   exHave: string;
   exWant: string;
   consent: boolean;
+  thirdPartyConsent: boolean;
 };
 
 type FieldKey =
-  | 'studentId'
   | 'name'
+  | 'major'
   | 'phone'
   | 'gender'
   | 'age'
+  | 'agePref'
   | 'mbti'
   | 'haveCharmIds'
   | 'wantCharmIds'
-  | 'consent';
+  | 'consent'
+  | 'thirdPartyConsent';
 
 const initialFormData: FormData = {
-  studentId: '',
   name: '',
+  major: '',
   phone: '',
   gender: null,
   age: '',
+  agePref: { any: false, ids: [] },
   mbti: 'ENTJ',
   haveCharmIds: [],
   wantCharmIds: [],
   exHave: '',
   exWant: '',
   consent: false,
+  thirdPartyConsent: false,
 };
 
 export default function Home() {
@@ -105,38 +150,46 @@ export default function Home() {
   const [mbtiAxes, setMbtiAxes] = useState<MbtiAxes>(initialMbtiAxes);
 
   const [touched, setTouched] = useState<Record<FieldKey, boolean>>({
-    studentId: false,
     name: false,
+    major: false,
     phone: false,
     gender: false,
     age: false,
+    agePref: false,
     mbti: false,
     haveCharmIds: false,
     wantCharmIds: false,
     consent: false,
+    thirdPartyConsent: false,
   });
 
   const [errors, setErrors] = useState<Record<FieldKey, string>>({
-    studentId: '',
     name: '',
+    major: '',
     phone: '',
     gender: '',
     age: '',
+    agePref: '',
     mbti: '',
     haveCharmIds: '',
     wantCharmIds: '',
     consent: '',
+    thirdPartyConsent: '',
   });
 
   const [charms, setCharms] = useState<Charm[]>([]);
   const [charmsLoading, setCharmsLoading] = useState(true);
   const [charmsError, setCharmsError] = useState('');
+  const [majors, setMajors] = useState<Major[]>([]);
   const [consentOpen, setConsentOpen] = useState(false);
+  const [thirdPartyConsentOpen, setThirdPartyConsentOpen] = useState(false);
 
-  const [stats, setStats] = useState({
+  const [stats, setStats] = useState<SurveyStats>({
     total: 0,
     male: 0,
     female: 0,
+    major_count: 0,
+    majors: [],
   });
 
   const [isMounted, setIsMounted] = useState(false);
@@ -144,6 +197,12 @@ export default function Home() {
   const [submitted, setSubmitted] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [showToast, setShowToast] = useState(false);
+  const [googleSession, setGoogleSession] = useState<GoogleAuthSession | null>(
+    null
+  );
+  const [authLoading, setAuthLoading] = useState(true);
+  const [loggingOut, setLoggingOut] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
 
   const triggerToast = (msg: string) => {
     setToastMessage(msg);
@@ -164,6 +223,8 @@ export default function Home() {
         total: data.total ?? 0,
         male: data.male ?? 0,
         female: data.female ?? 0,
+        major_count: data.major_count ?? 0,
+        majors: Array.isArray(data.majors) ? data.majors : [],
       });
     } catch (err) {
       console.error('Error fetching statistics:', err);
@@ -189,10 +250,69 @@ export default function Home() {
     }
   };
 
+  const fetchMajors = async () => {
+    try {
+      const list = await getMajors();
+      setMajors(list);
+    } catch (err) {
+      console.error('Error fetching majors:', err);
+      setMajors([]);
+    }
+  };
+
   useEffect(() => {
     setIsMounted(true);
     fetchStats();
     fetchCharms();
+    fetchMajors();
+
+    const params = new URLSearchParams(window.location.search);
+    const errorCode = params.get('error');
+    if (errorCode === 'not_student') {
+      window.alert('학생만 참가할 수 있습니다.');
+      window.history.replaceState({}, '', window.location.pathname);
+    } else {
+      const oauthError = oauthErrorMessage(errorCode);
+      if (oauthError) {
+        triggerToast(`⚠️ ${oauthError}`);
+        window.history.replaceState({}, '', window.location.pathname);
+      }
+    }
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const session = await getGoogleSession();
+        if (cancelled) return;
+        if (session.authenticated) {
+          const displayName = parseStudentDisplayName(session.name);
+          if (!displayName) {
+            window.alert('학생만 참가할 수 있습니다.');
+            await logoutGoogle();
+            if (cancelled) return;
+            setGoogleSession({ authenticated: false });
+            return;
+          }
+          setGoogleSession(session);
+          if (session.submitted) setSubmitted(true);
+          setFormData((prev) => ({
+            ...prev,
+            name: displayName,
+          }));
+        } else {
+          setGoogleSession(session);
+        }
+      } catch (err) {
+        console.error('Error fetching Google session:', err);
+        if (!cancelled) setGoogleSession({ authenticated: false });
+      } finally {
+        if (!cancelled) setAuthLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const validateField = (name: FieldKey, value: FormData[FieldKey]): string => {
@@ -202,17 +322,15 @@ export default function Home() {
         return '';
       case 'name': {
         const v = typeof value === 'string' ? value.trim() : '';
-        if (!v) return '이름을 입력해 주세요.';
+        if (!v) return '구글 계정에서 이름을 불러오지 못했습니다.';
         if (v.length < 2) return '이름은 2글자 이상이어야 합니다.';
-        if (/[0-9]/.test(v)) return '이름에 숫자는 포함할 수 없습니다.';
-        if (/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(v))
-          return '특수문자는 사용할 수 없습니다.';
         return '';
       }
-      case 'studentId': {
+      case 'major': {
         const v = typeof value === 'string' ? value.trim() : '';
-        if (!v) return '학번을 입력해 주세요.';
-        if (!/^\d{10}$/.test(v)) return '학번은 정확히 10자리 숫자여야 합니다.';
+        if (!v) return '학과를 선택해 주세요.';
+        if (!majors.some((item) => item.major_id === v))
+          return '학과를 목록에서 선택해 주세요.';
         return '';
       }
       case 'phone': {
@@ -229,6 +347,12 @@ export default function Home() {
         const n = Number(v);
         if (n < 17 || n > 40) return '나이는 17~40 사이로 입력해 주세요.';
         return '';
+      }
+      case 'agePref': {
+        const v = value as AgePrefForm;
+        if (v.any) return '';
+        if (v.ids.length > 0) return '';
+        return '선호하는 연령 조건을 선택해 주세요.';
       }
       case 'mbti': {
         const v = typeof value === 'string' ? value.trim() : '';
@@ -248,6 +372,9 @@ export default function Home() {
       case 'consent':
         if (value !== true) return '개인정보 수집·이용에 동의해 주세요.';
         return '';
+      case 'thirdPartyConsent':
+        if (value !== true) return '개인정보 제3자 제공에 동의해 주세요.';
+        return '';
       default:
         return '';
     }
@@ -259,9 +386,6 @@ export default function Home() {
     const { name, value } = e.target;
     let finalValue = value;
 
-    if (name === 'studentId') {
-      finalValue = value.replace(/\D/g, '').slice(0, 10);
-    }
     if (name === 'phone') {
       finalValue = formatKrPhone(value);
     }
@@ -284,6 +408,33 @@ export default function Home() {
     setFormData((prev) => ({ ...prev, gender: value }));
     setTouched((prev) => ({ ...prev, gender: true }));
     setErrors((prev) => ({ ...prev, gender: '' }));
+  };
+
+  const handleAgeAny = (checked: boolean) => {
+    const next: AgePrefForm = checked
+      ? { any: true, ids: [] }
+      : { any: false, ids: formData.agePref.ids };
+    setFormData((prev) => ({ ...prev, agePref: next }));
+    setTouched((prev) => ({ ...prev, agePref: true }));
+    setErrors((prev) => ({
+      ...prev,
+      agePref: validateField('agePref', next),
+    }));
+  };
+
+  const toggleAgePref = (id: AgePrefSpecificId) => {
+    if (formData.agePref.any) return;
+    const current = formData.agePref.ids;
+    const ids = current.includes(id)
+      ? current.filter((item) => item !== id)
+      : [...current, id];
+    const next: AgePrefForm = { any: false, ids };
+    setFormData((prev) => ({ ...prev, agePref: next }));
+    setTouched((prev) => ({ ...prev, agePref: true }));
+    setErrors((prev) => ({
+      ...prev,
+      agePref: validateField('agePref', next),
+    }));
   };
 
   const handleMbtiAxis = (key: MbtiAxisKey, letter: string) => {
@@ -323,39 +474,48 @@ export default function Home() {
 
   const handleSubmit = async () => {
     const fields: FieldKey[] = [
-      'studentId',
       'name',
+      'major',
       'phone',
       'gender',
       'age',
+      'agePref',
       'mbti',
       'haveCharmIds',
       'wantCharmIds',
       'consent',
+      'thirdPartyConsent',
     ];
 
     setTouched({
-      studentId: true,
       name: true,
+      major: true,
       phone: true,
       gender: true,
       age: true,
+      agePref: true,
       mbti: true,
       haveCharmIds: true,
       wantCharmIds: true,
       consent: true,
+      thirdPartyConsent: true,
     });
 
     const newErrors = {
-      studentId: validateField('studentId', formData.studentId),
       name: validateField('name', formData.name),
+      major: validateField('major', formData.major),
       phone: validateField('phone', formData.phone),
       gender: validateField('gender', formData.gender),
       age: validateField('age', formData.age),
+      agePref: validateField('agePref', formData.agePref),
       mbti: validateField('mbti', formData.mbti),
       haveCharmIds: validateField('haveCharmIds', formData.haveCharmIds),
       wantCharmIds: validateField('wantCharmIds', formData.wantCharmIds),
       consent: validateField('consent', formData.consent),
+      thirdPartyConsent: validateField(
+        'thirdPartyConsent',
+        formData.thirdPartyConsent
+      ),
     };
 
     setErrors(newErrors);
@@ -379,11 +539,13 @@ export default function Home() {
       const exWant = formData.exWant.trim();
 
       await submitSurvey({
-        student_id: formData.studentId,
-        name: formData.name.trim(),
         phone: formData.phone.trim(),
         gender: formData.gender as boolean,
         age: Number(formData.age),
+        major_id: formData.major,
+        age_pref_ids: formData.agePref.any
+          ? [AGE_PREF_ANY]
+          : formData.agePref.ids,
         mbti: formData.mbti,
         have_charm_ids: formData.haveCharmIds,
         want_charm_ids: formData.wantCharmIds,
@@ -391,6 +553,8 @@ export default function Home() {
         ex_want: exWant || null,
         consent_agreed: true,
         consent_version: CONSENT_VERSION,
+        third_party_consent_agreed: true,
+        third_party_consent_version: THIRD_PARTY_CONSENT_VERSION,
       });
 
       setSubmitted(true);
@@ -399,8 +563,17 @@ export default function Home() {
       console.error('Submit error:', err);
       if (err instanceof ApiError && err.status === 409) {
         triggerToast(
-          '⚠️ 이미 접수된 학번입니다. 사전조사는 한 번만 참여하실 수 있습니다.'
+          '⚠️ 이미 이 구글 계정으로 접수했습니다. 사전조사는 한 번만 참여하실 수 있습니다.'
         );
+        setSubmitted(true);
+      } else if (err instanceof ApiError && err.status === 403) {
+        window.alert('학생만 참가할 수 있습니다.');
+        await logoutGoogle();
+        setGoogleSession({ authenticated: false });
+        setSubmitted(false);
+      } else if (err instanceof ApiError && err.status === 401) {
+        setGoogleSession({ authenticated: false });
+        triggerToast('⚠️ 학교 구글 계정으로 로그인해 주세요.');
       } else {
         const message =
           err instanceof Error ? err.message : '서버 응답 오류';
@@ -411,7 +584,40 @@ export default function Home() {
     }
   };
 
-  const textInputKeys = ['studentId', 'name', 'phone', 'age'] as const;
+  const handleLogout = async () => {
+    setLoggingOut(true);
+    try {
+      await logoutGoogle();
+      setGoogleSession({ authenticated: false });
+      setSubmitted(false);
+    } catch (err) {
+      console.error('Logout error:', err);
+      triggerToast('❌ 로그아웃에 실패했습니다.');
+    } finally {
+      setLoggingOut(false);
+    }
+  };
+
+  const handleCancelSurvey = async () => {
+    if (!window.confirm('접수를 취소할까요? 입력한 내용은 삭제됩니다.')) {
+      return;
+    }
+    setCancelling(true);
+    try {
+      await cancelSurvey();
+      setSubmitted(false);
+      fetchStats();
+    } catch (err) {
+      console.error('Cancel error:', err);
+      const message =
+        err instanceof Error ? err.message : '접수를 취소하지 못했습니다.';
+      triggerToast(`❌ ${message}`);
+    } finally {
+      setCancelling(false);
+    }
+  };
+
+  const textInputKeys = ['name', 'phone', 'age'] as const;
 
   const getInputClass = (fieldName: (typeof textInputKeys)[number]) => {
     const base =
@@ -439,19 +645,26 @@ export default function Home() {
         : 'bg-[#FDE8EC] text-[#2B1B2E] border-[#F0D9DF] hover:bg-[#fcdde3]'
     }`;
 
-  const chartData = [
-    { name: '남자', value: stats.male, color: '#3B82F6' },
-    { name: '여자', value: stats.female, color: '#E8526A' },
-  ];
-
   return (
     <div className="min-h-screen bg-[#FBF6F0] text-[#2B1B2E] font-sans pb-[calc(80px+env(safe-area-inset-bottom))]">
-      <Link
-        href="/admin"
-        className="fixed top-4 right-4 z-40 px-3 py-2 rounded-xl text-xs font-bold tracking-wide bg-white/90 border border-[#F0D9DF] text-[#8C7A8E] shadow-sm hover:bg-[#FDE8EC] hover:text-[#E8526A]"
-      >
-        관리자
-      </Link>
+      {googleSession?.authenticated && (
+        <button
+          type="button"
+          onClick={handleLogout}
+          disabled={loggingOut}
+          className="fixed top-4 left-4 z-40 px-3 py-2 rounded-xl text-xs font-bold tracking-wide bg-white/90 border border-[#F0D9DF] text-[#8C7A8E] shadow-sm hover:bg-[#FDE8EC] hover:text-[#E8526A] disabled:opacity-50"
+        >
+          {loggingOut ? '처리 중…' : '로그아웃'}
+        </button>
+      )}
+      {googleSession?.authenticated && googleSession.isAdmin && (
+        <Link
+          href="/admin"
+          className="fixed top-4 right-4 z-40 px-3 py-2 rounded-xl text-xs font-bold tracking-wide bg-white/90 border border-[#F0D9DF] text-[#8C7A8E] shadow-sm hover:bg-[#FDE8EC] hover:text-[#E8526A]"
+        >
+          관리자
+        </Link>
+      )}
       <div className="max-w-[480px] mx-auto px-4 pt-6 pb-12">
         <div className="flex items-center justify-center gap-2 mb-5">
           <Image
@@ -462,7 +675,7 @@ export default function Home() {
             className="h-8 w-8 object-contain"
           />
           <p className="text-sm font-semibold tracking-wide text-[#8C7A8E]">
-            컴소과 X 총학생회
+            컴퓨터소프트웨어과
           </p>
         </div>
         {/* Header */}
@@ -486,179 +699,204 @@ export default function Home() {
         </div>
 
         {/* Statistics Board */}
-        {!isMounted ? (
-          <div className="bg-white border border-[#F0D9DF] rounded-2xl p-5 shadow-sm mb-6 h-[170px] animate-pulse flex flex-col items-center justify-center text-xs text-[#8C7A8E] gap-2">
-            <span>참여 현황 불러오는 중…</span>
-          </div>
-        ) : (
-          <div className="bg-white border border-[#F0D9DF] rounded-2xl p-5 shadow-sm mb-6 text-center">
-            <h2 className="text-xs font-bold text-[#8C7A8E] tracking-wider uppercase mb-1">
-              지금까지
-            </h2>
-            <div className="text-3xl font-extrabold text-[#E8526A] mb-3">
-              총<span className="text-[#2B1B2E]">{stats.total}</span>명이 접수했어요.
-            </div>
-
-            {stats.total > 0 ? (
-              <div className="flex flex-col items-center">
-                <div className="w-full h-[140px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={chartData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={35}
-                        outerRadius={55}
-                        paddingAngle={4}
-                        dataKey="value"
-                      >
-                        {chartData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip
-                        formatter={(value) => [`${value}명`]}
-                        contentStyle={{
-                          background: '#2B1B2E',
-                          border: 'none',
-                          borderRadius: '12px',
-                          color: '#fff',
-                          fontSize: '12px',
-                        }}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-                <div className="flex justify-center gap-6 text-xs font-bold text-[#2B1B2E] -mt-1">
-                  <div className="flex items-center gap-1.5">
-                    <span className="w-2.5 h-2.5 rounded-full bg-[#3B82F6]" />
-                    <span>
-                      남자 {stats.male}명 (
-                      {Math.round((stats.male / stats.total) * 100)}%)
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="w-2.5 h-2.5 rounded-full bg-[#E8526A]" />
-                    <span>
-                      여자 {stats.female}명 (
-                      {Math.round((stats.female / stats.total) * 100)}%)
-                    </span>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="py-6 text-xs text-[#8C7A8E] bg-[#FDE8EC] rounded-xl border border-[#F0D9DF]/60">
-                아직 신청한 학생이 없습니다. 첫 번째 신청자가 되어보세요! 🚀
-              </div>
-            )}
-          </div>
-        )}
+        <StatsBoard stats={stats} loading={!isMounted} />
 
         <div className="text-center mb-8">
           <p className="text-sm text-[#8C7A8E] mt-1.5 leading-relaxed">
-            아래 정보를 입력해 주세요.
-            <br />
-            매칭에만 사용하고, 이벤트가 끝나는 즉시 폐기해요.
+            {googleSession?.authenticated ? (
+              <>
+                아래 정보를 입력해 주세요.
+                <br />
+                매칭에만 사용하고, 이벤트가 끝나는 즉시 폐기해요.
+              </>
+            ) : (
+              <>
+                연성대학교 구글 계정(@yeonsung.ac.kr)으로
+                <br />
+                로그인한 뒤 사전 접수를 진행해 주세요.
+              </>
+            )}
           </p>
         </div>
 
-        {submitted ? (
-          <div className="text-center py-10 bg-white border border-[#F0D9DF] rounded-2xl p-6 shadow-sm">
-            <div className="text-[60px]">🎉</div>
-            <h2 className="text-[22px] font-bold text-[#E8526A] mt-4">제출 완료!</h2>
-            <p className="text-[15px] text-[#8C7A8E] mt-2 leading-relaxed">
-              사전조사가 성공적으로 접수됐어요.
-              <br />곧 좋은 인연을 연결해 드릴게요 💕
+        {authLoading ? (
+          <div className="bg-white border border-[#F0D9DF] rounded-2xl p-6 shadow-sm h-[180px] animate-pulse flex flex-col items-center justify-center text-xs text-[#8C7A8E] gap-2">
+            <span>로그인 상태를 확인하는 중…</span>
+          </div>
+        ) : !googleSession?.authenticated ? (
+          <div className="bg-white border border-[#F0D9DF] rounded-2xl p-6 shadow-sm text-center">
+            <p className="text-sm text-[#8C7A8E] leading-relaxed mb-5">
+              학교에서 부여한 구글 계정으로만 접수할 수 있어요.
             </p>
+            <a
+              href="/api/auth/google"
+              className="w-full inline-flex items-center justify-center gap-2 min-h-[52px] px-5 py-3.5 bg-white border border-[#F0D9DF] hover:bg-[#FDE8EC] text-[#2B1B2E] text-[16px] font-semibold rounded-xl transition-colors duration-200"
+            >
+              <svg
+                className="w-5 h-5"
+                viewBox="0 0 24 24"
+                xmlns="http://www.w3.org/2000/svg"
+                aria-hidden="true"
+              >
+                <path
+                  fill="#4285F4"
+                  d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                />
+                <path
+                  fill="#34A853"
+                  d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                />
+                <path
+                  fill="#FBBC05"
+                  d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                />
+                <path
+                  fill="#EA4335"
+                  d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                />
+              </svg>
+              구글 계정으로 로그인
+            </a>
+          </div>
+        ) : submitted ? (
+          <div className="text-center py-10 bg-white border border-[#F0D9DF] rounded-2xl p-6 shadow-sm">
+            {googleSession.authenticated && (
+              <div className="mb-6 flex items-center gap-3 rounded-xl bg-[#FDE8EC] border border-[#F0D9DF] px-3 py-2.5 text-left">
+                {googleSession.picture ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={googleSession.picture}
+                    alt=""
+                    width={36}
+                    height={36}
+                    className="h-9 w-9 rounded-full object-cover bg-white"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-sm font-bold text-[#E8526A]">
+                    {parseStudentDisplayName(googleSession.name)?.slice(0, 1) ||
+                      googleSession.name.slice(0, 1)}
+                  </span>
+                )}
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold text-[#2B1B2E]">
+                    {googleSession.name}
+                  </p>
+                  <p className="truncate text-xs text-[#8C7A8E]">
+                    {googleSession.email}
+                  </p>
+                </div>
+              </div>
+            )}
+            <div className="text-[60px]">🎉</div>
+            <h2 className="text-[22px] font-bold text-[#E8526A] mt-4">접수 완료</h2>
+            <p className="text-[15px] text-[#8C7A8E] mt-2 leading-relaxed">
+              이미 사전조사가 접수된 상태예요.
+              <br />곧 좋은 인연을 연결해 드릴게요.
+            </p>
+            <button
+              type="button"
+              onClick={handleCancelSurvey}
+              disabled={cancelling}
+              className="mt-6 w-full min-h-[48px] rounded-xl border border-[#F0D9DF] bg-white px-4 py-3 text-sm font-semibold text-[#8C7A8E] hover:bg-[#FDE8EC] hover:text-[#E8526A] disabled:opacity-50"
+            >
+              {cancelling ? '취소 중…' : '접수 취소'}
+            </button>
           </div>
         ) : (
           <div className="bg-white border border-[#F0D9DF] rounded-2xl p-6 shadow-sm">
-            <form onSubmit={(e) => e.preventDefault()} noValidate className="space-y-5">
-              {/* Student ID */}
-              <div className="flex flex-col gap-1">
-                <label
-                  htmlFor="studentId"
-                  className="flex flex-wrap items-center gap-y-0.5 text-xs font-semibold text-[#8C7A8E] tracking-wider uppercase"
-                >
-                  <span>
-                    🎓 학번<span className="text-[#E8526A]">*</span>
-                  </span>
-                  <span className="text-[10px] text-[#8C7A8E] normal-case sm:ml-2 font-normal leading-relaxed">
-                    우리 학교 학생인지 확인하기 위해 사용해요. 외부에 공개되지 않아요.
-                  </span>
-                </label>
-                <div className="relative">
-                  <input
-                    type="tel"
-                    id="studentId"
-                    name="studentId"
-                    placeholder="학번 10자리 숫자"
-                    maxLength={10}
-                    inputMode="numeric"
-                    autoComplete="off"
-                    value={formData.studentId}
-                    onChange={handleChange}
-                    onBlur={handleBlur}
-                    className={`${getInputClass('studentId')} pr-12`}
+            {googleSession.authenticated && (
+              <div className="mb-5 flex items-center gap-3 rounded-xl bg-[#FDE8EC] border border-[#F0D9DF] px-3 py-2.5">
+                {googleSession.picture ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={googleSession.picture}
+                    alt=""
+                    width={36}
+                    height={36}
+                    className="h-9 w-9 rounded-full object-cover bg-white"
+                    referrerPolicy="no-referrer"
                   />
-                  {touched.studentId && (
-                    <span
-                      className={`absolute right-4 top-1/2 -translate-y-1/2 font-bold text-lg pointer-events-none transition-all duration-200 ${
-                        errors.studentId ? 'text-[#E8526A]' : 'text-[#4CAF82]'
-                      }`}
-                    >
-                      {errors.studentId ? '✕' : '✓'}
-                    </span>
-                  )}
+                ) : (
+                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-sm font-bold text-[#E8526A]">
+                    {parseStudentDisplayName(googleSession.name)?.slice(0, 1) ||
+                      googleSession.name.slice(0, 1)}
+                  </span>
+                )}
+                <div className="min-w-0 flex-1 text-left">
+                  <p className="truncate text-sm font-semibold text-[#2B1B2E]">
+                    {googleSession.name}
+                  </p>
+                  <p className="truncate text-xs text-[#8C7A8E]">
+                    {googleSession.email}
+                  </p>
                 </div>
-                <p
-                  className={`text-xs leading-relaxed transition-all duration-150 ${getHintDetails('studentId').style}`}
-                >
-                  {getHintDetails('studentId').text}
-                </p>
               </div>
-
+            )}
+            <form onSubmit={(e) => e.preventDefault()} noValidate className="space-y-5">
               {/* Name */}
               <div className="flex flex-col gap-1">
                 <label
                   htmlFor="name"
-                  className="flex flex-wrap items-center gap-y-0.5 text-xs font-semibold text-[#8C7A8E] tracking-wider uppercase"
+                  className="text-xs font-semibold text-[#8C7A8E] tracking-wider uppercase"
                 >
-                  <span>
-                    🪪 이름<span className="text-[#E8526A]">*</span>
-                  </span>
-                  <span className="text-[10px] text-[#8C7A8E] normal-case sm:ml-2 font-normal leading-relaxed">
-                    우리 학교 학생인지 확인하기 위해 사용해요. 외부에 공개되지 않아요.
-                  </span>
+                  🪪 이름<span className="text-[#E8526A]">*</span>
                 </label>
                 <div className="relative">
                   <input
                     type="text"
                     id="name"
                     name="name"
-                    placeholder="실명을 입력해 주세요"
-                    maxLength={20}
-                    autoComplete="name"
+                    readOnly
                     value={formData.name}
-                    onChange={handleChange}
-                    onBlur={handleBlur}
-                    className={`${getInputClass('name')} pr-12`}
+                    className={`${getInputClass('name')} pr-12 bg-[#F7F0F2] text-[#8C7A8E] cursor-not-allowed`}
                   />
-                  {touched.name && (
-                    <span
-                      className={`absolute right-4 top-1/2 -translate-y-1/2 font-bold text-lg pointer-events-none transition-all duration-200 ${
-                        errors.name ? 'text-[#E8526A]' : 'text-[#4CAF82]'
-                      }`}
-                    >
-                      {errors.name ? '✕' : '✓'}
-                    </span>
-                  )}
                 </div>
-                <p
-                  className={`text-xs leading-relaxed transition-all duration-150 ${getHintDetails('name').style}`}
+              </div>
+
+              {/* Major */}
+              <div className="flex flex-col gap-1">
+                <label
+                  htmlFor="major"
+                  className="text-xs font-semibold text-[#8C7A8E] tracking-wider uppercase"
                 >
-                  {getHintDetails('name').text}
+                  🏛 학과<span className="text-[#E8526A]">*</span>
+                </label>
+                <select
+                  id="major"
+                  name="major"
+                  value={formData.major}
+                  onChange={handleChange}
+                  onBlur={handleBlur}
+                  className={`w-full px-4 py-3 border-1.5 rounded-xl font-sans text-[16px] bg-[#FDE8EC] transition-all duration-200 outline-none focus:border-[#E8526A] focus:bg-white focus:ring-3 focus:ring-[#E8526A]/10 appearance-none ${
+                    !formData.major ? 'text-[#C9B0BE]' : 'text-[#2B1B2E]'
+                  } ${
+                    !touched.major
+                      ? 'border-[#F0D9DF]'
+                      : errors.major
+                        ? 'border-[#E8526A] bg-[#FEF0F2]'
+                        : 'border-[#4CAF82] bg-[#F2FBF6]'
+                  }`}
+                >
+                  <option value="">학과를 선택해 주세요</option>
+                  {majors.map((item) => (
+                    <option key={item.major_id} value={item.major_id}>
+                      {item.name}
+                    </option>
+                  ))}
+                </select>
+                <p
+                  className={`text-xs leading-relaxed transition-all duration-150 ${
+                    touched.major
+                      ? errors.major
+                        ? 'text-[#E8526A] min-h-[16px] mt-1'
+                        : 'text-[#4CAF82] font-semibold min-h-[16px] mt-1'
+                      : 'text-[#8C7A8E] min-h-[0px] mt-0'
+                  }`}
+                >
+                  {touched.major
+                    ? errors.major || '✓ 확인됐어요'
+                    : ''}
                 </p>
               </div>
 
@@ -672,7 +910,7 @@ export default function Home() {
                     📞 전화번호<span className="text-[#E8526A]">*</span>
                   </span>
                   <span className="text-[10px] text-[#8C7A8E] normal-case sm:ml-2 font-normal leading-relaxed">
-                    매칭 연락에 사용해요. 외부에 공개되지 않아요.
+                    매칭된 상대에게 전화번호가 전달돼요.
                   </span>
                 </label>
                 <div className="relative">
@@ -710,13 +948,8 @@ export default function Home() {
 
               {/* Gender */}
               <div className="flex flex-col gap-1" id="gender">
-                <label className="flex flex-wrap items-center gap-y-0.5 text-xs font-semibold text-[#8C7A8E] tracking-wider uppercase">
-                  <span>
-                    ⚧ 성별<span className="text-[#E8526A]">*</span>
-                  </span>
-                  <span className="text-[10px] text-[#8C7A8E] normal-case sm:ml-2 font-normal leading-relaxed">
-                    매칭 그룹을 나누는 데 활용해요.
-                  </span>
+                <label className="text-xs font-semibold text-[#8C7A8E] tracking-wider uppercase">
+                  ⚧ 성별<span className="text-[#E8526A]">*</span>
                 </label>
                 <div className="flex gap-4">
                   <button
@@ -800,6 +1033,67 @@ export default function Home() {
                   className={`text-xs leading-relaxed transition-all duration-150 ${getHintDetails('age').style}`}
                 >
                   {getHintDetails('age').text}
+                </p>
+              </div>
+
+              {/* Preferred age */}
+              <div className="flex flex-col gap-2" id="agePref">
+                <label className="flex flex-wrap items-center gap-y-0.5 text-xs font-semibold text-[#8C7A8E] tracking-wider uppercase">
+                  <span>
+                    선호하는 연령<span className="text-[#E8526A]">*</span>
+                  </span>
+                  <span className="text-[10px] text-[#8C7A8E] normal-case sm:ml-2 font-normal leading-relaxed">
+                    중복 선택이 가능해요.
+                  </span>
+                </label>
+                <label className="flex items-center gap-2.5 text-sm leading-relaxed cursor-pointer">
+                  <input
+                    id="agePref-any"
+                    type="checkbox"
+                    checked={formData.agePref.any}
+                    onChange={(e) => handleAgeAny(e.target.checked)}
+                    className="h-4 w-4 shrink-0 accent-[#E8526A]"
+                  />
+                  <span>상관없음</span>
+                </label>
+                <div className="flex gap-2">
+                  {AGE_PREF_SPECIFIC.map((option) => {
+                    const selected = formData.agePref.ids.includes(
+                      option.age_pref_id
+                    );
+                    const disabled = formData.agePref.any;
+                    return (
+                      <button
+                        key={option.age_pref_id}
+                        type="button"
+                        disabled={disabled}
+                        onClick={() => toggleAgePref(option.age_pref_id)}
+                        className={`flex-1 py-3 px-3 rounded-xl border text-[15px] font-semibold transition-all duration-200 ${
+                          disabled
+                            ? 'bg-[#F7F0F2] text-[#C9B0BE] border-[#F0D9DF] cursor-not-allowed'
+                            : selected
+                              ? 'bg-[#E8526A] text-white border-[#E8526A] shadow-sm'
+                              : 'bg-[#FDE8EC] text-[#2B1B2E] border-[#F0D9DF] hover:bg-[#fcdde3]'
+                        }`}
+                      >
+                        {option.name}
+                        {selected && !disabled ? ' ✓' : ''}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p
+                  className={`text-xs leading-relaxed transition-all duration-150 ${
+                    touched.agePref && errors.agePref
+                      ? 'text-[#E8526A] min-h-[16px] mt-1'
+                      : touched.agePref && !errors.agePref
+                        ? 'text-[#4CAF82] font-semibold min-h-[16px] mt-1'
+                        : 'text-[#8C7A8E] min-h-[0px] mt-0'
+                  }`}
+                >
+                  {touched.agePref
+                    ? errors.agePref || '✓ 확인됐어요'
+                    : ''}
                 </p>
               </div>
 
@@ -1087,9 +1381,14 @@ export default function Home() {
               </div>
               {/* Privacy consent */}
               <div className="flex flex-col gap-2" id="consent" tabIndex={-1}>
-                <h3 className="text-base font-bold text-[#2B1B2E]">
-                  {CONSENT_TITLE}
-                  <span className="text-[#E8526A]">*</span>
+                <h3 className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-base font-bold text-[#2B1B2E]">
+                  <span>
+                    {CONSENT_TITLE}
+                    <span className="text-[#E8526A]">*</span>
+                  </span>
+                  <span className="text-[10px] font-normal text-[#8C7A8E] leading-relaxed">
+                    매칭 완료 후 안내 문자를 발송드려요.
+                  </span>
                 </h3>
                 <p className="text-[11px] text-[#8C7A8E] leading-relaxed">
                   개인정보처리자: {CONSENT_PROCESSOR} · 동의문 버전 {CONSENT_VERSION}
@@ -1135,7 +1434,7 @@ export default function Home() {
                     <p>
                       <span className="font-bold">제3자 제공</span>
                       <br />
-                      {CONSENT_THIRD_PARTY}
+                      {CONSENT_THIRD_PARTY_NOTE}
                     </p>
                     <p>
                       <span className="font-bold">처리 위탁</span>
@@ -1176,40 +1475,119 @@ export default function Home() {
                     : `전문은 저장 시 버전 ${CONSENT_VERSION}으로 기록됩니다.`}
                 </p>
               </div>
-            </form>
 
-            <hr className="border-t-1.5 border-dashed border-[#F0D9DF] my-5" />
-
-            {/* Kakao Info */}
-            <div className="space-y-3.5">
-              <h3 className="font-bold text-base">
-                카카오톡 오픈채팅방에 입장하고 알림을 받으세요!
-              </h3>
-              <p className="text-sm text-[#8C7A8E] leading-relaxed">
-                매칭이 완료되면 오픈채팅방으로 공지를 올려드려요.
-                <br />
-                직접 만나기 전까지는 상대가 누구인지 알 수 없어요!
-              </p>
-              <a
-                href="#"
-                className="w-full inline-flex items-center justify-center gap-2 px-7 py-3.5 bg-[#FEE500] hover:bg-[#E6CE00] active:bg-[#D5BE00] text-[#191919] text-[16px] font-semibold rounded-xl text-center transition-colors duration-200"
+              {/* Third-party provision consent */}
+              <div
+                className="flex flex-col gap-2"
+                id="thirdPartyConsent"
+                tabIndex={-1}
               >
-                <svg
-                  className="w-5 h-5 fill-current"
-                  viewBox="0 0 24 24"
-                  xmlns="http://www.w3.org/2000/svg"
+                <h3 className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-base font-bold text-[#2B1B2E]">
+                  <span>
+                    {THIRD_PARTY_CONSENT_TITLE}
+                    <span className="text-[#E8526A]">*</span>
+                  </span>
+                  <span className="text-[10px] font-normal text-[#8C7A8E] leading-relaxed">
+                    매칭된 상대방에게 연락처를 전달드려요.
+                  </span>
+                </h3>
+                <p className="text-[11px] text-[#8C7A8E] leading-relaxed">
+                  개인정보처리자: {CONSENT_PROCESSOR} · 동의문 버전{' '}
+                  {THIRD_PARTY_CONSENT_VERSION}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setThirdPartyConsentOpen((open) => !open)}
+                  aria-expanded={thirdPartyConsentOpen}
+                  className="self-start text-sm font-semibold text-[#E8526A] underline underline-offset-2 decoration-[#E8526A]/50 hover:decoration-[#E8526A]"
                 >
-                  <path d="M12 3c-5.523 0-10 3.582-10 8 0 2.536 1.487 4.797 3.75 6.223l-1.042 3.125a.5.5 0 0 0 .62.62l3.414-1.138A10.82 10.82 0 0 0 12 19c5.523 0 10-3.582 10-8s-4.477-8-10-8z" />
-                </svg>
-                카카오톡 오픈채팅 입장하기
-              </a>
-            </div>
+                  {thirdPartyConsentOpen ? '전문 닫기' : '전문 보기'}
+                </button>
+                {thirdPartyConsentOpen && (
+                  <div className="max-h-56 overflow-y-auto rounded-xl border border-[#F0D9DF] bg-[#FDE8EC]/50 px-3 py-3 text-[12px] leading-relaxed text-[#2B1B2E] space-y-2.5">
+                    <p>
+                      QRious는 「개인정보 보호법」 제17조에 따라 아래 사항을 알리고
+                      동의를 받습니다.
+                    </p>
+                    <p>
+                      <span className="font-bold">제공받는 자</span>
+                      <br />
+                      {THIRD_PARTY_RECIPIENT}
+                    </p>
+                    <p>
+                      <span className="font-bold">제공받는 자의 이용 목적</span>
+                      <br />
+                      {THIRD_PARTY_PURPOSE}
+                    </p>
+                    <p>
+                      <span className="font-bold">제공하는 개인정보 항목</span>
+                      <br />
+                      필수: {THIRD_PARTY_ITEMS}
+                      <br />
+                      선택: {THIRD_PARTY_OPTIONAL_ITEMS}
+                    </p>
+                    <p>
+                      <span className="font-bold underline decoration-[#E8526A] underline-offset-2">
+                        제공받는 자의 보유 및 이용 기간
+                      </span>
+                      <br />
+                      {THIRD_PARTY_RETENTION}
+                    </p>
+                    <p>
+                      <span className="font-bold">동의 거부 권리 및 불이익</span>
+                      <br />
+                      {THIRD_PARTY_REFUSAL}
+                    </p>
+                  </div>
+                )}
+                <label className="flex items-start gap-2.5 text-sm leading-relaxed cursor-pointer">
+                  <input
+                    id="third-party-consent-checkbox"
+                    type="checkbox"
+                    checked={formData.thirdPartyConsent}
+                    onChange={(e) => {
+                      const next = e.target.checked;
+                      setFormData((prev) => ({
+                        ...prev,
+                        thirdPartyConsent: next,
+                      }));
+                      setTouched((prev) => ({
+                        ...prev,
+                        thirdPartyConsent: true,
+                      }));
+                      setErrors((prev) => ({
+                        ...prev,
+                        thirdPartyConsent: validateField(
+                          'thirdPartyConsent',
+                          next
+                        ),
+                      }));
+                    }}
+                    className="mt-1 h-4 w-4 shrink-0 accent-[#E8526A]"
+                  />
+                  <span>
+                    개인정보 제3자 제공 내용을 확인했으며 이에 동의합니다. (필수)
+                  </span>
+                </label>
+                <p
+                  className={`text-xs leading-relaxed ${
+                    touched.thirdPartyConsent && errors.thirdPartyConsent
+                      ? 'text-[#E8526A]'
+                      : 'text-[#8C7A8E]'
+                  }`}
+                >
+                  {touched.thirdPartyConsent && errors.thirdPartyConsent
+                    ? errors.thirdPartyConsent
+                    : `전문은 저장 시 버전 ${THIRD_PARTY_CONSENT_VERSION}으로 기록됩니다.`}
+                </p>
+              </div>
+            </form>
           </div>
         )}
       </div>
 
       {/* Floating Submit Bar */}
-      {!submitted && (
+      {!submitted && googleSession?.authenticated && (
         <div className="fixed bottom-0 left-0 right-0 bg-[#FBF6F0]/92 backdrop-blur-md border-t border-[#F0D9DF] px-4 py-3 z-50 pb-[calc(12px+env(safe-area-inset-bottom))]">
           <button
             type="button"

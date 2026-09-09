@@ -10,12 +10,17 @@ type RouteContext = {
 };
 
 export async function DELETE(req: NextRequest, context: RouteContext) {
-  const denied = requireAdmin(req);
+  const denied = await requireAdmin(req);
   if (denied) return denied;
 
   const { studentId } = await context.params;
-  if (!/^\d{10}$/.test(studentId)) {
-    return jsonError(400, 'VALIDATION_ERROR', '학번이 올바르지 않습니다.');
+  const isLegacyId = /^\d{10}$/.test(studentId);
+  const isUuid =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      studentId
+    );
+  if (!isLegacyId && !isUuid) {
+    return jsonError(400, 'VALIDATION_ERROR', '참가자 ID가 올바르지 않습니다.');
   }
 
   try {

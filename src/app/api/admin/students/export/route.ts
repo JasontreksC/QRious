@@ -16,7 +16,7 @@ function stamp(): string {
 }
 
 export async function GET(req: NextRequest) {
-  const denied = requireAdmin(req);
+  const denied = await requireAdmin(req);
   if (denied) return denied;
 
   try {
@@ -29,11 +29,13 @@ export async function GET(req: NextRequest) {
     const sheet = workbook.addWorksheet('참가자');
 
     sheet.columns = [
-      { header: '학번', key: 'student_id', width: 14 },
       { header: '이름', key: 'name', width: 12 },
+      { header: '이메일', key: 'email', width: 28 },
+      { header: '학과', key: 'major', width: 22 },
       { header: '전화번호', key: 'phone', width: 16 },
       { header: '성별', key: 'gender', width: 8 },
       { header: '나이', key: 'age', width: 8 },
+      { header: '선호 연령', key: 'age_prefs', width: 18 },
       { header: 'MBTI', key: 'mbti', width: 10 },
       { header: '매력', key: 'have', width: 40 },
       { header: '이상형', key: 'want', width: 40 },
@@ -42,17 +44,22 @@ export async function GET(req: NextRequest) {
       { header: '동의 여부', key: 'consent_agreed', width: 12 },
       { header: '동의 시각', key: 'consented_at', width: 22 },
       { header: '동의문 버전', key: 'consent_version', width: 16 },
+      { header: '제3자 제공 동의', key: 'third_party_consent_agreed', width: 16 },
+      { header: '제3자 제공 동의 시각', key: 'third_party_consented_at', width: 22 },
+      { header: '제3자 제공 동의문 버전', key: 'third_party_consent_version', width: 22 },
     ];
 
     sheet.getRow(1).font = { bold: true };
 
     for (const s of students) {
       sheet.addRow({
-        student_id: s.student_id,
         name: s.name,
+        email: s.email ?? '',
+        major: s.major ?? '',
         phone: s.phone,
         gender: s.gender ? '여자' : '남자',
         age: s.age ?? '',
+        age_prefs: s.age_prefs.join(', '),
         mbti: s.mbti,
         have: s.have.join(', '),
         want: s.want.join(', '),
@@ -61,6 +68,10 @@ export async function GET(req: NextRequest) {
         consent_agreed: s.consent_agreed === true ? '동의' : '미확인',
         consented_at: s.consented_at ?? '',
         consent_version: s.consent_version ?? '',
+        third_party_consent_agreed:
+          s.third_party_consent_agreed === true ? '동의' : '미확인',
+        third_party_consented_at: s.third_party_consented_at ?? '',
+        third_party_consent_version: s.third_party_consent_version ?? '',
       });
     }
 

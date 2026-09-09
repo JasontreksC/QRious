@@ -6,7 +6,7 @@ import { isUniqueViolation, jsonError } from '@/lib/http';
 export const runtime = 'nodejs';
 
 export async function POST(req: NextRequest) {
-  const denied = requireAdmin(req);
+  const denied = await requireAdmin(req);
   if (denied) return denied;
 
   let body: { name?: unknown };

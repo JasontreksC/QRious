@@ -13,7 +13,7 @@ type RouteContext = {
 };
 
 export async function DELETE(req: NextRequest, context: RouteContext) {
-  const denied = requireAdmin(req);
+  const denied = await requireAdmin(req);
   if (denied) return denied;
 
   const { charmId } = await context.params;
