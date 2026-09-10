@@ -94,16 +94,7 @@ async function loadMatchRows(
 
 async function partnerFromRow(
   sql: Sql,
-  row: {
-    round: unknown;
-    student_id: unknown;
-    name: unknown;
-    phone: unknown;
-    gender: unknown;
-    age: unknown;
-    mbti: unknown;
-    major: unknown;
-  }
+  row: Record<string, any>
 ): Promise<MatchPartner> {
   const partnerId = String(row.student_id);
   const haveRows = await sql`
