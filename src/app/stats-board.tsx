@@ -16,7 +16,18 @@ import {
 import type { SurveyStats } from '@/lib/api';
 
 const SLIDES = ['성별 접수 통계', '학과별 TOP10'] as const;
-const BAR_PINK = ['#E8526A', '#EC6A7C', '#F28C6E', '#F0A3B2', '#F5C3CC'];
+const BAR_COLORS = [
+  '#EF238E',
+  '#50B0D1',
+  '#B5DC10',
+  '#2D3437',
+  '#F56AB0',
+  '#85CCE3',
+  '#CFEA69',
+  '#647074',
+  '#F7A8CF',
+  '#BDE5F1',
+];
 
 function ChevronIcon({ direction }: { direction: 'left' | 'right' }) {
   return (
@@ -48,13 +59,13 @@ export function StatsBoard({
   const [slide, setSlide] = useState(0);
 
   const genderData = [
-    { name: '남자', value: stats.male, color: '#3B82F6' },
-    { name: '여자', value: stats.female, color: '#E8526A' },
+    { name: '남자', value: stats.male, color: '#50B0D1' },
+    { name: '여자', value: stats.female, color: '#EF238E' },
   ];
   const majorData = stats.majors.slice(0, 10).map((item, index) => ({
     ...item,
     label: item.short_name,
-    fill: BAR_PINK[Math.min(index, BAR_PINK.length - 1)],
+    fill: BAR_COLORS[Math.min(index, BAR_COLORS.length - 1)],
   }));
 
   const goToSlide = (index: number) => {
@@ -135,14 +146,14 @@ export function StatsBoard({
               </div>
               <div className="flex justify-center gap-6 text-xs font-bold text-[#2B1B2E] -mt-1">
                 <div className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-full bg-[#3B82F6]" />
+                  <span className="w-2.5 h-2.5 rounded-full bg-[#50B0D1]" />
                   <span>
                     남자 {stats.male}명 (
                     {Math.round((stats.male / stats.total) * 100)}%)
                   </span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <span className="w-2.5 h-2.5 rounded-full bg-[#E8526A]" />
+                  <span className="w-2.5 h-2.5 rounded-full bg-[#EF238E]" />
                   <span>
                     여자 {stats.female}명 (
                     {Math.round((stats.female / stats.total) * 100)}%)
@@ -177,7 +188,7 @@ export function StatsBoard({
                 >
                   <CartesianGrid
                     vertical={false}
-                    stroke="#F0D9DF"
+                    stroke="#CFE8F0"
                     strokeDasharray="3 3"
                   />
                   <XAxis
@@ -186,12 +197,12 @@ export function StatsBoard({
                     angle={-32}
                     textAnchor="end"
                     height={62}
-                    tick={{ fill: '#8C7A8E', fontSize: 11 }}
+                    tick={{ fill: '#68767B', fontSize: 11 }}
                   />
                   <YAxis
                     allowDecimals={false}
                     width={24}
-                    tick={{ fill: '#8C7A8E', fontSize: 10 }}
+                    tick={{ fill: '#68767B', fontSize: 10 }}
                   />
                   <Bar
                     dataKey="count"
@@ -206,7 +217,7 @@ export function StatsBoard({
                     <LabelList
                       dataKey="count"
                       position="top"
-                      fill="#2B1B2E"
+                      fill="#2D3437"
                       fontSize={10}
                       fontWeight={700}
                     />
