@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { emailIsAdmin } from '@/lib/admin-auth';
 import { getSql } from '@/lib/db';
 import { getSessionFromRequest } from '@/lib/google-auth';
+import { studentHasMatchByEmail } from '@/lib/match-result';
 
 export const runtime = 'nodejs';
 
@@ -12,6 +13,7 @@ export async function GET(req: NextRequest) {
   }
 
   let submitted = false;
+  let matched = false;
   try {
     const sql = getSql();
     const rows = await sql`
@@ -21,6 +23,7 @@ export async function GET(req: NextRequest) {
       LIMIT 1
     `;
     submitted = rows.length > 0;
+    matched = await studentHasMatchByEmail(session.email, sql);
   } catch (err) {
     console.error('GET /api/auth/session', err);
   }
@@ -31,6 +34,7 @@ export async function GET(req: NextRequest) {
     name: session.name,
     picture: session.picture,
     submitted,
+    matched,
     isAdmin: await emailIsAdmin(session.email),
   });
 }

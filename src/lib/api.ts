@@ -108,6 +108,16 @@ export type OwnSurvey = {
   ex_want: string | null;
 };
 
+export type MatchPartner = {
+  name: string;
+  phone: string;
+  gender: boolean;
+  age: number | null;
+  mbti: string;
+  major: string | null;
+  have: string[];
+};
+
 export type SurveyPatch = {
   phone?: string;
   gender?: boolean;
@@ -189,6 +199,7 @@ export type GoogleAuthSession =
       name: string;
       picture: string | null;
       submitted: boolean;
+      matched: boolean;
       isAdmin: boolean;
     };
 

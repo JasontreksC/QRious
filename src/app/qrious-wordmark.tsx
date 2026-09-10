@@ -20,12 +20,22 @@ const HEART_DOTS = PIXEL_HEART.flatMap((row, rowIndex) =>
   )
 );
 
-function PixelHeart({ side }: { side: 'left' | 'right' }) {
+export function PixelHeart({
+  side,
+  className,
+}: {
+  side?: 'left' | 'right';
+  className?: string;
+}) {
   return (
     <span
       className={`${styles.pixelHeart} ${
-        side === 'left' ? styles.pixelHeartLeft : styles.pixelHeartRight
-      }`}
+        side === 'left'
+          ? styles.pixelHeartLeft
+          : side === 'right'
+            ? styles.pixelHeartRight
+            : ''
+      } ${className ?? ''}`}
       aria-hidden="true"
     >
       {HEART_DOTS.map(({ rowIndex, columnIndex }, index) => (

@@ -23,6 +23,7 @@ export type GooglePublicSession = {
   name: string;
   picture: string | null;
   submitted: boolean;
+  matched: boolean;
 };
 
 function getAuthSecret(): string | null {
