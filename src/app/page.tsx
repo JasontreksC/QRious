@@ -45,6 +45,7 @@ import { parseStudentDisplayName } from '@/lib/student-name';
 import { StatsBoard } from './stats-board';
 import { DeadlineCountdown, SurveyClosedPage, useSurveyOpen } from './deadline-countdown';
 import { QriousWordmark } from './qrious-wordmark';
+import { SiteHeader } from './site-header';
 import { SubmittedSurvey } from './submitted-survey';
 import { isSurveyOpen } from '@/lib/deadline';
 import qriousLogo from './icon.png';
@@ -661,40 +662,21 @@ export default function Home() {
         </span>
         <span className={styles.chromeStar}>✦</span>
       </div>
-      {googleSession?.authenticated && (
-        <button
-          type="button"
-          onClick={handleLogout}
-          disabled={loggingOut}
-          className="fixed top-4 left-4 z-40 px-3 py-2 rounded-xl text-xs font-bold tracking-wide bg-white/90 border border-[#F0D9DF] text-[#8C7A8E] shadow-sm hover:bg-[#FDE8EC] hover:text-[#E8526A] disabled:opacity-50"
-        >
-          {loggingOut ? '처리 중…' : '로그아웃'}
-        </button>
-      )}
+      <SiteHeader
+        onLogout={
+          googleSession?.authenticated ? handleLogout : undefined
+        }
+        loggingOut={loggingOut}
+      />
       {googleSession?.authenticated && googleSession.isAdmin && (
         <Link
           href="/admin"
-          className="fixed top-4 right-4 z-40 px-3 py-2 rounded-xl text-xs font-bold tracking-wide bg-white/90 border border-[#F0D9DF] text-[#8C7A8E] shadow-sm hover:bg-[#FDE8EC] hover:text-[#E8526A]"
+          className={`${styles.sessionChipRight} px-3 py-2 rounded-xl text-xs font-bold tracking-wide bg-white/90 border border-[#F0D9DF] text-[#8C7A8E] shadow-sm hover:bg-[#FDE8EC] hover:text-[#E8526A]`}
         >
           관리자
         </Link>
       )}
       <div className={`${styles.pageContent} max-w-[480px] mx-auto px-4 pt-6 pb-12`}>
-        <div
-          className={`${styles.schoolBadge} mx-auto flex items-center justify-center gap-2 mb-5`}
-        >
-          <Image
-            src="/ysu-logo.svg"
-            alt="영남대학교"
-            width={32}
-            height={32}
-            className="h-8 w-8 object-contain"
-          />
-          <p className="text-sm font-semibold tracking-wide text-[#8C7A8E]">
-            컴퓨터소프트웨어과
-          </p>
-        </div>
-        {/* Header */}
         <div className={`${styles.hero} text-center mb-8`}>
           <p className={styles.eyebrow}>
             <span className={styles.statusDot} aria-hidden="true" />
@@ -748,12 +730,18 @@ export default function Home() {
               ♡
             </span>
             <br />
-            축제에서 시작될 우리만의 러브 스토리를 만나보세요!
+            즐거운 양지대동제를 새 인연과 시작해보세요!
           </p>
         </div>
 
         {/* Statistics Board */}
         <StatsBoard stats={stats} loading={!isMounted} />
+        <Link href="/matching" className={styles.matchingInfoLink}>
+          <span className={styles.matchingInfoIcon} aria-hidden="true">
+            i
+          </span>
+          매칭 시스템에 대해서...
+        </Link>
         <DeadlineCountdown />
 
         {!submitted && surveyOpen && (
@@ -783,10 +771,6 @@ export default function Home() {
         ) : !surveyOpen ? (
           <SurveyClosedPage />
         ) : !googleSession?.authenticated ? (
-          <div className="bg-white border border-[#F0D9DF] rounded-2xl p-6 shadow-sm text-center">
-            <p className="text-sm text-[#8C7A8E] leading-relaxed mb-5">
-              학교에서 부여한 구글 계정으로만 접수할 수 있어요.
-            </p>
             <a
               href="/api/auth/google"
               className="w-full inline-flex items-center justify-center gap-2 min-h-[52px] px-5 py-3.5 bg-white border border-[#F0D9DF] hover:bg-[#FDE8EC] text-[#2B1B2E] text-[16px] font-semibold rounded-xl transition-colors duration-200"
@@ -816,7 +800,6 @@ export default function Home() {
               </svg>
               구글 계정으로 로그인
             </a>
-          </div>
         ) : submitted ? (
           <div>
             <div className="text-center py-10 bg-white border border-[#F0D9DF] rounded-2xl p-6 shadow-sm">
@@ -854,6 +837,17 @@ export default function Home() {
                 이미 사전조사가 접수된 상태예요.
                 <br />곧 좋은 인연을 연결해 드릴게요.
               </p>
+              <div className="mt-4 rounded-xl border border-[#F0D9DF] bg-[#FDE8EC] px-4 py-3.5">
+                <p className="text-[15px] font-bold text-[#E8526A] leading-relaxed">
+                  10월 15일 축제 당일, 오전 중 문자로 매칭되었음을 알려드릴 거예요!
+                  <br />
+                  문자로 받은 링크로 오시거나, 아니면 이 페이지를 저장했다가 축제 당일 다시 로그인하면 매칭된 상대의 이름, 연락처, 정보를 확인할 수 있어요.
+                  <br />
+                  매칭된 커플끼리 컴소과 주점으로 오시면 메뉴 할인! 매칭 결과 페이지를 두분이서 보여주시면 됩니다.
+                  <br />
+                  남녀 비율이 안맞으면 매칭이 안될수도 있어요..ㅜㅜ 그렇게 된다면 아쉽지만 다른 기회를 알아보는걸로 해요.
+                </p>
+              </div>
               <SubmittedSurvey
                 majors={majors}
                 charms={charms}
@@ -867,7 +861,7 @@ export default function Home() {
               type="button"
               onClick={handleCancelSurvey}
               disabled={cancelling}
-              className="mt-4 mx-auto block bg-transparent p-2 text-[13px] text-[#B5A3B0] hover:text-[#8C7A8E] disabled:opacity-50"
+              className="mt-4 mx-auto block bg-transparent p-2 text-[13px] font-semibold text-[#E8526A] underline underline-offset-2 decoration-[#E8526A]/50 hover:decoration-[#E8526A] disabled:opacity-50"
             >
               {cancelling ? '취소 중…' : '접수 취소'}
             </button>
