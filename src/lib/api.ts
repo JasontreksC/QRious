@@ -91,6 +91,7 @@ export type SurveyResponse = {
 
 export type OwnSurvey = {
   student_id: string;
+  round: 1 | 2;
   name: string;
   phone: string;
   gender: boolean;
@@ -109,6 +110,7 @@ export type OwnSurvey = {
 };
 
 export type MatchPartner = {
+  round: 1 | 2;
   name: string;
   phone: string;
   gender: boolean;
@@ -171,6 +173,7 @@ export async function cancelSurvey(): Promise<void> {
 
 export type AdminStudent = {
   student_id: string;
+  round: 1 | 2;
   name: string;
   phone: string;
   gender: boolean;
@@ -199,6 +202,9 @@ export type GoogleAuthSession =
       name: string;
       picture: string | null;
       submitted: boolean;
+      rounds: number[];
+      round1SubmittedAt: string | null;
+      round2SubmittedAt: string | null;
       matched: boolean;
       isAdmin: boolean;
     };

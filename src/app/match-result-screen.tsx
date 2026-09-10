@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { logoutGoogle, type MatchPartner } from '@/lib/api';
+import type { Round2CtaState } from '@/lib/deadline';
 import { parseStudentDisplayName } from '@/lib/student-name';
 import { PixelHeart, QriousWordmark } from './qrious-wordmark';
 import { SiteHeader } from './site-header';
@@ -11,6 +12,8 @@ import styles from './y2k-theme.module.css';
 type MatchResultScreenProps = {
   partner: MatchPartner;
   isAdmin: boolean;
+  round2Cta: Round2CtaState;
+  round2OpenLabel: string;
   account: {
     name: string;
     email: string;
@@ -21,6 +24,8 @@ type MatchResultScreenProps = {
 export function MatchResultScreen({
   partner,
   isAdmin,
+  round2Cta,
+  round2OpenLabel,
   account,
 }: MatchResultScreenProps) {
   const [loggingOut, setLoggingOut] = useState(false);
@@ -106,7 +111,7 @@ export function MatchResultScreen({
           <div className="text-[52px] leading-none mt-2" aria-hidden="true">
             💌
           </div>
-          <h2 className={styles.resultTitle}>매칭 완료</h2>
+          <h2 className={styles.resultTitle}>{partner.round}차 매칭 완료</h2>
           <p className={styles.resultLead}>
             축제에서 만날 상대를 찾았어요.
             <br />
@@ -136,6 +141,24 @@ export function MatchResultScreen({
           </p>
         </div>
         </div>
+        {round2Cta !== 'closed' ? (
+          <div className={styles.round2Cta}>
+            {round2Cta === 'open' ? (
+              <Link href="/?apply=2" className={styles.round2CtaLink}>
+                기대와 달랐나요? 2차 접수하기
+              </Link>
+            ) : round2Cta === 'submitted' ? (
+              <p className={styles.round2CtaNote}>2차 접수가 완료되었어요.</p>
+            ) : (
+              <div className={styles.round2CtaUpcoming}>
+                <p className={styles.round2CtaLead}>기대와 달랐나요?</p>
+                <p className={styles.round2CtaNote}>
+                  2차 접수는 {round2OpenLabel}부터 가능해요.
+                </p>
+              </div>
+            )}
+          </div>
+        ) : null}
       </div>
     </div>
   );

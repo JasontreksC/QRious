@@ -7,6 +7,7 @@ export async function fetchJoinedStudents(sql: Sql): Promise<AdminStudent[]> {
     sql`
       SELECT
         s.student_id,
+        s.round,
         s.name,
         s.phone,
         s.gender,
@@ -102,6 +103,7 @@ export async function fetchJoinedStudents(sql: Sql): Promise<AdminStudent[]> {
     const id = String(row.student_id);
     return {
       student_id: id,
+      round: Number(row.round) === 2 ? 2 : 1,
       name: row.name ?? '',
       phone: row.phone ?? '',
       gender: Boolean(row.gender),

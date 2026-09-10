@@ -43,11 +43,11 @@ import {
 } from '@/lib/age-pref';
 import { parseStudentDisplayName } from '@/lib/student-name';
 import { StatsBoard } from './stats-board';
-import { DeadlineCountdown, SurveyClosedPage, useSurveyOpen } from './deadline-countdown';
+import { DeadlineCountdown, Round1ResultAndRound2OpenNotice, SurveyClosedPage, UnmatchedPage, useNow, useRegistrationRound, useSurveyOpen } from './deadline-countdown';
 import { QriousWordmark } from './qrious-wordmark';
 import { SiteHeader } from './site-header';
 import { SubmittedSurvey } from './submitted-survey';
-import { isSurveyOpen } from '@/lib/deadline';
+import { EVENT_TIMES, formatKstMonthDayTime, getHeroTitlePlaques, getParticipantHomeView, isAwaitingAnnouncement, isRound1ResultAndRound2Open, isSurveyOpen, shouldShowGoogleLogin, roundLabel } from '@/lib/deadline';
 import qriousLogo from './icon.png';
 import styles from './y2k-theme.module.css';
 
@@ -147,7 +147,59 @@ const initialFormData: FormData = {
   consent: false,
 };
 
-export default function Home() {
+function GoogleLoginButton() {
+  return (
+    <a
+      href="/api/auth/google"
+      className="w-full inline-flex items-center justify-center gap-2 min-h-[52px] px-5 py-3.5 bg-white border border-[#F0D9DF] hover:bg-[#FDE8EC] text-[#2B1B2E] text-[16px] font-semibold rounded-xl transition-colors duration-200"
+    >
+      <svg
+        className="w-5 h-5"
+        viewBox="0 0 24 24"
+        xmlns="http://www.w3.org/2000/svg"
+        aria-hidden="true"
+      >
+        <path
+          fill="#4285F4"
+          d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+        />
+        <path
+          fill="#34A853"
+          d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+        />
+        <path
+          fill="#FBBC05"
+          d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+        />
+        <path
+          fill="#EA4335"
+          d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+        />
+      </svg>
+      구글 계정으로 로그인
+    </a>
+  );
+}
+
+function HeroTitlePlaque({ label }: { label: string }) {
+  return (
+    <span className={styles.titleLine}>
+      <span className={styles.titleStar} aria-hidden="true">
+        ★
+      </span>
+      {label}
+      <span className={styles.titleStar} aria-hidden="true">
+        ★
+      </span>
+    </span>
+  );
+}
+
+export default function Home({
+  applyRound2 = false,
+}: {
+  applyRound2?: boolean;
+}) {
   const [formData, setFormData] = useState<FormData>(initialFormData);
 
   const [mbtiAxes, setMbtiAxes] = useState<MbtiAxes>(initialMbtiAxes);
@@ -201,11 +253,37 @@ export default function Home() {
   const [googleSession, setGoogleSession] = useState<GoogleAuthSession | null>(
     null
   );
-  const [authLoading, setAuthLoading] = useState(true);
+  const [authLoading, setAuthLoading] = useState(
+    () => !isAwaitingAnnouncement()
+  );
   const [loggingOut, setLoggingOut] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false);
   const surveyOpen = useSurveyOpen();
+  const registrationRound = useRegistrationRound();
+  const now = useNow();
+  const awaitingAnnouncement = isAwaitingAnnouncement(now);
+  const showGoogleLogin = shouldShowGoogleLogin(now);
+  const round1ResultAndRound2Open = isRound1ResultAndRound2Open(now);
+  const heroPlaques = getHeroTitlePlaques(now);
+  const previousRound1 =
+    googleSession?.authenticated === true &&
+    googleSession.rounds.includes(1);
+  const homeView =
+    googleSession?.authenticated === true
+      ? getParticipantHomeView({
+          rounds: googleSession.rounds,
+          applyRound2,
+          now,
+        })
+      : null;
+  const displayRound =
+    registrationRound ??
+    (googleSession?.authenticated && googleSession.rounds.includes(2)
+      ? 2
+      : googleSession?.authenticated && googleSession.rounds.includes(1)
+        ? 1
+        : null);
 
   const triggerToast = (msg: string) => {
     setToastMessage(msg);
@@ -281,8 +359,18 @@ export default function Home() {
         window.history.replaceState({}, '', window.location.pathname);
       }
     }
+  }, []);
+
+  useEffect(() => {
+    if (awaitingAnnouncement) {
+      setAuthLoading(false);
+      setGoogleSession(null);
+      setSubmitted(false);
+      return;
+    }
 
     let cancelled = false;
+    setAuthLoading(true);
     (async () => {
       try {
         const session = await getGoogleSession();
@@ -297,7 +385,7 @@ export default function Home() {
             return;
           }
           setGoogleSession(session);
-          if (session.matched) {
+          if (session.matched && !applyRound2) {
             window.location.replace('/result');
             return;
           }
@@ -320,7 +408,7 @@ export default function Home() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [applyRound2, awaitingAnnouncement]);
 
   const validateField = (name: FieldKey, value: FormData[FieldKey]): string => {
     switch (name) {
@@ -562,12 +650,22 @@ export default function Home() {
       });
 
       setSubmitted(true);
+      if (registrationRound != null) {
+        setGoogleSession((prev) => {
+          if (!prev?.authenticated) return prev;
+          return {
+            ...prev,
+            submitted: true,
+            rounds: [...new Set([...prev.rounds, registrationRound])],
+          };
+        });
+      }
       fetchStats();
     } catch (err: unknown) {
       console.error('Submit error:', err);
       if (err instanceof ApiError && err.status === 409) {
         triggerToast(
-          '⚠️ 이미 이 구글 계정으로 접수했습니다. 사전조사는 한 번만 참여하실 수 있습니다.'
+          '⚠️ 이미 이번 차수에 접수했습니다.'
         );
         setSubmitted(true);
       } else if (err instanceof ApiError && err.status === 403) {
@@ -612,6 +710,16 @@ export default function Home() {
     try {
       await cancelSurvey();
       setSubmitted(false);
+      if (registrationRound != null) {
+        setGoogleSession((prev) => {
+          if (!prev?.authenticated) return prev;
+          return {
+            ...prev,
+            submitted: false,
+            rounds: prev.rounds.filter((round) => round !== registrationRound),
+          };
+        });
+      }
       fetchStats();
     } catch (err) {
       console.error('Cancel error:', err);
@@ -668,11 +776,15 @@ export default function Home() {
       </div>
       <SiteHeader
         onLogout={
-          googleSession?.authenticated ? handleLogout : undefined
+          !awaitingAnnouncement && googleSession?.authenticated
+            ? handleLogout
+            : undefined
         }
         loggingOut={loggingOut}
       />
-      {googleSession?.authenticated && googleSession.isAdmin && (
+      {!awaitingAnnouncement &&
+        googleSession?.authenticated &&
+        googleSession.isAdmin && (
         <Link
           href="/admin"
           className={`${styles.sessionChipRight} px-3 py-2 rounded-xl text-xs font-bold tracking-wide bg-white/90 border border-[#F0D9DF] text-[#8C7A8E] shadow-sm hover:bg-[#FDE8EC] hover:text-[#E8526A]`}
@@ -715,17 +827,13 @@ export default function Home() {
           </div>
           <h1
             className={styles.heroTitle}
-            aria-label="QRious Y2K 소개팅 사전 접수"
+            aria-label={heroPlaques.join(', ')}
           >
             <QriousWordmark />
-            <span className={styles.titleLine}>
-              <span className={styles.titleStar} aria-hidden="true">
-                ★
-              </span>
-              QR 소개팅 사전 접수
-              <span className={styles.titleStar} aria-hidden="true">
-                ★
-              </span>
+            <span className={styles.titleLines}>
+              {heroPlaques.map((label) => (
+                <HeroTitlePlaque key={label} label={label} />
+              ))}
             </span>
           </h1>
           <p className={styles.heroCopy}>
@@ -748,11 +856,20 @@ export default function Home() {
         </Link>
         <DeadlineCountdown />
 
-        {!submitted && surveyOpen && (
+        {(homeView === 'form' ||
+          (!googleSession?.authenticated &&
+            surveyOpen &&
+            !round1ResultAndRound2Open)) && (
           <div className="text-center mb-8">
             <p className="text-sm text-[#8C7A8E] mt-1.5 leading-relaxed">
               {googleSession?.authenticated ? (
                 <>
+                  {registrationRound === 2 && previousRound1 ? (
+                    <>
+                      1차에 접수하셨어도 2차 매칭을 원하시면 다시 접수해 주세요.
+                      <br />
+                    </>
+                  ) : null}
                   아래 정보를 입력해 주세요.
                   <br />
                   매칭에만 사용하고, 이벤트가 끝나는 즉시 폐기해요.
@@ -761,50 +878,46 @@ export default function Home() {
                 <>
                   연성대학교 구글 계정(@yeonsung.ac.kr)으로
                   <br />
-                  로그인한 뒤 사전 접수를 진행해 주세요.
+                  로그인한 뒤 {registrationRound ? `${registrationRound}차 ` : ''}접수를 진행해 주세요.
                 </>
               )}
             </p>
           </div>
         )}
 
-        {authLoading && surveyOpen ? (
+        {awaitingAnnouncement ? (
+          <SurveyClosedPage />
+        ) : authLoading ? (
           <div className="bg-white border border-[#F0D9DF] rounded-2xl p-6 shadow-sm h-[180px] animate-pulse flex flex-col items-center justify-center text-xs text-[#8C7A8E] gap-2">
             <span>로그인 상태를 확인하는 중…</span>
           </div>
-        ) : !surveyOpen ? (
-          <SurveyClosedPage />
         ) : !googleSession?.authenticated ? (
-            <a
-              href="/api/auth/google"
-              className="w-full inline-flex items-center justify-center gap-2 min-h-[52px] px-5 py-3.5 bg-white border border-[#F0D9DF] hover:bg-[#FDE8EC] text-[#2B1B2E] text-[16px] font-semibold rounded-xl transition-colors duration-200"
-            >
-              <svg
-                className="w-5 h-5"
-                viewBox="0 0 24 24"
-                xmlns="http://www.w3.org/2000/svg"
-                aria-hidden="true"
-              >
-                <path
-                  fill="#4285F4"
-                  d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                />
-                <path
-                  fill="#34A853"
-                  d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                />
-                <path
-                  fill="#FBBC05"
-                  d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-                />
-                <path
-                  fill="#EA4335"
-                  d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                />
-              </svg>
-              구글 계정으로 로그인
-            </a>
-        ) : submitted ? (
+          <div className="space-y-4">
+            {round1ResultAndRound2Open ? (
+              <Round1ResultAndRound2OpenNotice />
+            ) : !surveyOpen ? (
+              <SurveyClosedPage />
+            ) : null}
+            {showGoogleLogin ? <GoogleLoginButton /> : null}
+          </div>
+        ) : homeView === 'never' ? (
+          <SurveyClosedPage hasSurvey={false} />
+        ) : homeView === 'closed' ? (
+          <SurveyClosedPage />
+        ) : homeView === 'unmatched' ||
+          homeView === 'unmatched-with-round2' ? (
+          <UnmatchedPage
+            unmatchedRound={googleSession.rounds.includes(2) ? 2 : 1}
+            showRound2Cta={homeView === 'unmatched-with-round2'}
+            submittedAt={
+              googleSession.authenticated
+                ? googleSession.rounds.includes(2)
+                  ? googleSession.round2SubmittedAt
+                  : googleSession.round1SubmittedAt
+                : null
+            }
+          />
+        ) : homeView === 'submitted' ? (
           <div>
             <div className="text-center py-10 bg-white border border-[#F0D9DF] rounded-2xl p-6 shadow-sm">
               {googleSession.authenticated && (
@@ -836,20 +949,30 @@ export default function Home() {
                 </div>
               )}
               <div className="text-[60px]">🎉</div>
-              <h2 className="text-[22px] font-bold text-[#E8526A] mt-4">접수 완료</h2>
+              <h2 className="text-[22px] font-bold text-[#E8526A] mt-4">
+                {displayRound ? `${roundLabel(displayRound)} ` : ''}접수 완료
+              </h2>
               <p className="text-[15px] text-[#8C7A8E] mt-2 leading-relaxed">
-                이미 사전조사가 접수된 상태예요.
+                이미 {displayRound ? `${roundLabel(displayRound)} ` : ''}접수가 완료된 상태예요.
                 <br />곧 좋은 인연을 연결해 드릴게요.
               </p>
               <div className="mt-4 rounded-xl border border-[#F0D9DF] bg-[#FDE8EC] px-4 py-3.5">
                 <p className="text-[15px] font-bold text-[#E8526A] leading-relaxed">
-                  10월 15일 축제 당일, 오전 중 문자로 매칭되었음을 알려드릴 거예요!
+                  {displayRound === 2
+                    ? `2차 매칭 발표는 ${formatKstMonthDayTime(EVENT_TIMES.round2Announce)}예요.`
+                    : `1차 매칭 발표는 ${formatKstMonthDayTime(EVENT_TIMES.round1Announce)}예요.`}
+                  <br /><br />
+                  매칭 결과 발표 일시에 문자로 알림을 발송드릴 예정이에요.
                   <br />
-                  문자로 받은 링크로 오시거나, 아니면 이 페이지를 저장했다가 축제 당일 다시 로그인하면 매칭된 상대의 이름, 연락처, 정보를 확인할 수 있어요.
+                  문자로 받은 링크를 열거나, 이 사이트에 다시 로그인하면 결과 화면이 나와요. 거기서 매칭된 상대를 알 수 있어요.
+                  <br /><br />
+                  매칭된 커플끼리 컴소과 주점으로 오시면 서비스 드려요!
                   <br />
-                  매칭된 커플끼리 컴소과 주점으로 오시면 메뉴 할인! 매칭 결과 페이지를 두분이서 보여주시면 됩니다.
+                  매칭 결과 화면을 두분이서 보여주시면 됩니다.
+                  <br /><br />
+                  경우에 따라 매칭이 안될수도 있어요..ㅜㅜ
                   <br />
-                  남녀 비율이 안맞으면 매칭이 안될수도 있어요..ㅜㅜ 그렇게 된다면 아쉽지만 다른 기회를 알아보는걸로 해요.
+                  그러면 너무 아쉽겠지만, 더 좋은 기회가 찾아올거에요!
                 </p>
               </div>
               <SubmittedSurvey
@@ -861,14 +984,16 @@ export default function Home() {
                 onSaved={fetchStats}
               />
             </div>
-            <button
-              type="button"
-              onClick={handleCancelSurvey}
-              disabled={cancelling}
-              className="mt-4 mx-auto block bg-transparent p-2 text-[13px] font-semibold text-[#E8526A] underline underline-offset-2 decoration-[#E8526A]/50 hover:decoration-[#E8526A] disabled:opacity-50"
-            >
-              {cancelling ? '취소 중…' : '접수 취소'}
-            </button>
+            {surveyOpen ? (
+              <button
+                type="button"
+                onClick={handleCancelSurvey}
+                disabled={cancelling}
+                className="mt-4 mx-auto block bg-transparent p-2 text-[13px] font-semibold text-[#E8526A] underline underline-offset-2 decoration-[#E8526A]/50 hover:decoration-[#E8526A] disabled:opacity-50"
+              >
+                {cancelling ? '취소 중…' : '접수 취소'}
+              </button>
+            ) : null}
           </div>
         ) : (
           <div className="bg-white border border-[#F0D9DF] rounded-2xl p-6 shadow-sm">
@@ -1612,7 +1737,7 @@ export default function Home() {
       </div>
 
       {/* Floating Submit Bar */}
-      {!submitted && googleSession?.authenticated && surveyOpen && (
+      {homeView === 'form' && googleSession?.authenticated && surveyOpen && (
         <div className="fixed bottom-0 left-0 right-0 bg-[#FBF6F0]/92 backdrop-blur-md border-t border-[#F0D9DF] px-4 py-3 z-50 pb-[calc(12px+env(safe-area-inset-bottom))]">
           <button
             type="button"
@@ -1626,7 +1751,7 @@ export default function Home() {
                 제출 중…
               </>
             ) : (
-              '💌 제출하기'
+              `💌 ${registrationRound ? `${registrationRound}차 ` : ''}제출하기`
             )}
           </button>
         </div>

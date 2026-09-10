@@ -23,6 +23,9 @@ export type GooglePublicSession = {
   name: string;
   picture: string | null;
   submitted: boolean;
+  rounds: number[];
+  round1SubmittedAt: string | null;
+  round2SubmittedAt: string | null;
   matched: boolean;
 };
 

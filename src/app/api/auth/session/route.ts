@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { emailIsAdmin } from '@/lib/admin-auth';
+import { currentRegistrationRound } from '@/lib/deadline';
 import { getSql } from '@/lib/db';
 import { getSessionFromRequest } from '@/lib/google-auth';
 import { studentHasMatchByEmail } from '@/lib/match-result';
+import { listStudentRounds, loadRoundSubmittedAts } from '@/lib/own-survey';
 
 export const runtime = 'nodejs';
 
@@ -14,15 +16,18 @@ export async function GET(req: NextRequest) {
 
   let submitted = false;
   let matched = false;
+  let rounds: number[] = [];
+  let round1SubmittedAt: string | null = null;
+  let round2SubmittedAt: string | null = null;
   try {
     const sql = getSql();
-    const rows = await sql`
-      SELECT student_id
-      FROM student
-      WHERE google_sub = ${session.sub}
-      LIMIT 1
-    `;
-    submitted = rows.length > 0;
+    rounds = await listStudentRounds(sql, session.sub);
+    const submittedAts = await loadRoundSubmittedAts(sql, session.sub);
+    round1SubmittedAt = submittedAts[1];
+    round2SubmittedAt = submittedAts[2];
+    const currentRound = currentRegistrationRound();
+    submitted =
+      currentRound != null ? rounds.includes(currentRound) : rounds.length > 0;
     matched = await studentHasMatchByEmail(session.email, sql);
   } catch (err) {
     console.error('GET /api/auth/session', err);
@@ -34,6 +39,9 @@ export async function GET(req: NextRequest) {
     name: session.name,
     picture: session.picture,
     submitted,
+    rounds,
+    round1SubmittedAt,
+    round2SubmittedAt,
     matched,
     isAdmin: await emailIsAdmin(session.email),
   });

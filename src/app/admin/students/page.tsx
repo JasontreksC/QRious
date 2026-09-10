@@ -182,6 +182,7 @@ export default function AdminStudentsPage() {
             <thead className="sticky top-0 bg-white z-10">
               <tr className="text-xs uppercase tracking-wider text-[#8C7A8E] border-b border-[#F0D9DF]">
                 <th className="py-2 px-5 font-semibold">이름</th>
+                <th className="py-2 pr-3 font-semibold">차수</th>
                 <th className="py-2 pr-3 font-semibold">이메일</th>
                 <th className="py-2 pr-3 font-semibold">학과</th>
                 <th className="py-2 pr-3 font-semibold">전화번호</th>
@@ -198,6 +199,7 @@ export default function AdminStudentsPage() {
                   <React.Fragment key={student.student_id}>
                     <tr className="border-b border-[#F0D9DF]/80">
                       <td className="py-3 px-5">{student.name}</td>
+                      <td className="py-3 pr-3">{student.round}차</td>
                       <td className="py-3 pr-3 font-mono text-[13px]">
                         {student.email || '-'}
                       </td>
@@ -234,7 +236,7 @@ export default function AdminStudentsPage() {
                     </tr>
                     {open && (
                       <tr className="bg-[#FDE8EC]/50">
-                        <td colSpan={7} className="px-5 py-4">
+                        <td colSpan={9} className="px-5 py-4">
                           <div className="grid gap-3 sm:grid-cols-2">
                             <DetailBlock
                               title="have (나의 매력)"

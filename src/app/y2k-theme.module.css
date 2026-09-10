@@ -597,6 +597,22 @@
   transform: rotate(0.5deg);
 }
 
+.titleLines {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-top: 17px;
+}
+
+.titleLines .titleLine {
+  margin-top: 0;
+}
+
+.titleLines .titleLine:nth-child(even) {
+  transform: rotate(-0.5deg);
+}
+
 .titleStar {
   color: var(--y2k-pink);
   font-family: var(--font-geist-mono), monospace;
@@ -1016,6 +1032,52 @@
   font-size: 13px;
   font-weight: 550;
   line-height: 1.7;
+}
+
+.round2Cta {
+  margin: 28px 0 0;
+  text-align: center;
+}
+
+.round2CtaLink {
+  display: block;
+  padding: 14px 16px;
+  border: 1px solid rgb(232 82 106 / 35%);
+  border-radius: 14px;
+  background: rgb(232 82 106 / 10%);
+  color: #e8526a;
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  text-decoration: none;
+}
+
+.round2CtaLink:hover,
+.round2CtaLink:focus-visible {
+  background: rgb(232 82 106 / 16%);
+}
+
+.round2CtaUpcoming {
+  padding: 16px 14px;
+  border: 1px dashed rgb(232 82 106 / 35%);
+  border-radius: 14px;
+  background: rgb(255 255 255 / 80%);
+}
+
+.round2CtaLead {
+  margin: 0 0 6px;
+  color: #e8526a;
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.round2CtaNote {
+  margin: 0;
+  color: #8c7a8e;
+  font-size: 14px;
+  font-weight: 650;
+  line-height: 1.6;
 }
 
 .resultHero {

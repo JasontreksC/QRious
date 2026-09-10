@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { statsRound } from '@/lib/deadline';
 import { getSql } from '@/lib/db';
 import { jsonError } from '@/lib/http';
 
@@ -7,6 +8,7 @@ export const runtime = 'nodejs';
 export async function GET() {
   try {
     const sql = getSql();
+    const round = statsRound();
     const rows = await sql`
       SELECT
         COUNT(*)::int AS total,
@@ -14,6 +16,7 @@ export async function GET() {
         COUNT(*) FILTER (WHERE gender = true)::int AS female,
         COUNT(DISTINCT major_id)::int AS major_count
       FROM student
+      WHERE round = ${round}
     `;
 
     const majorRows = await sql`
@@ -24,6 +27,7 @@ export async function GET() {
         COUNT(*)::int AS count
       FROM student s
       JOIN major m ON m.major_id = s.major_id
+      WHERE s.round = ${round}
       GROUP BY m.major_id, m.name, m.short_name
       ORDER BY count DESC, m.name ASC
       LIMIT 10

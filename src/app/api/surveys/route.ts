@@ -21,7 +21,7 @@ import {
   THIRD_PARTY_REFUSAL,
   THIRD_PARTY_RETENTION,
 } from '@/lib/consent';
-import { isSurveyOpen } from '@/lib/deadline';
+import { currentRegistrationRound } from '@/lib/deadline';
 import { getSql } from '@/lib/db';
 import { getSessionFromRequest } from '@/lib/google-auth';
 import { isUniqueViolation, jsonError } from '@/lib/http';
@@ -124,7 +124,8 @@ export async function POST(req: NextRequest) {
     return jsonError(403, 'NOT_STUDENT', '학생만 참가할 수 있습니다.');
   }
 
-  if (!isSurveyOpen()) {
+  const round = currentRegistrationRound();
+  if (round == null) {
     return jsonError(403, 'DEADLINE', '접수가 마감되었습니다.');
   }
 
@@ -249,14 +250,14 @@ export async function POST(req: NextRequest) {
     const duplicateGoogle = await sql`
       SELECT student_id
       FROM student
-      WHERE google_sub = ${googleUser.sub}
+      WHERE google_sub = ${googleUser.sub} AND round = ${round}
       LIMIT 1
     `;
     if (duplicateGoogle.length > 0) {
       return jsonError(
         409,
         'DUPLICATE_GOOGLE',
-        '이미 이 구글 계정으로 접수했습니다.'
+        `이미 ${round}차 접수를 완료했습니다.`
       );
     }
 
@@ -285,10 +286,10 @@ export async function POST(req: NextRequest) {
 
     const queries = [
       sql`
-        INSERT INTO student (student_id, name, phone, gender, age, mbti, google_sub, email, major_id)
+        INSERT INTO student (student_id, name, phone, gender, age, mbti, google_sub, email, major_id, round)
         VALUES (
           ${studentId}, ${name}, ${phone}, ${gender}, ${age}, ${mbti},
-          ${googleUser.sub}, ${googleUser.email}, ${majorId}
+          ${googleUser.sub}, ${googleUser.email}, ${majorId}, ${round}
         )
       `,
       ...agePrefIds.map(
@@ -409,7 +410,7 @@ export async function POST(req: NextRequest) {
       return jsonError(
         409,
         'DUPLICATE_GOOGLE',
-        '이미 이 구글 계정으로 접수했습니다.'
+        '이미 이번 차수에 접수했습니다.'
       );
     }
     const message =
@@ -434,7 +435,8 @@ export async function PATCH(req: NextRequest) {
     );
   }
 
-  if (!isSurveyOpen()) {
+  const round = currentRegistrationRound();
+  if (round == null) {
     return jsonError(403, 'DEADLINE', '접수가 마감되었습니다.');
   }
 
@@ -469,7 +471,7 @@ export async function PATCH(req: NextRequest) {
     const existing = await sql`
       SELECT student_id
       FROM student
-      WHERE google_sub = ${googleUser.sub}
+      WHERE google_sub = ${googleUser.sub} AND round = ${round}
       LIMIT 1
     `;
     const studentId = existing[0] ? String(existing[0].student_id) : '';
@@ -695,7 +697,8 @@ export async function DELETE(req: NextRequest) {
     );
   }
 
-  if (!isSurveyOpen()) {
+  const round = currentRegistrationRound();
+  if (round == null) {
     return jsonError(403, 'DEADLINE', '접수가 마감되었습니다.');
   }
 
@@ -703,7 +706,7 @@ export async function DELETE(req: NextRequest) {
     const sql = getSql();
     const deleted = await sql`
       DELETE FROM student
-      WHERE google_sub = ${googleUser.sub}
+      WHERE google_sub = ${googleUser.sub} AND round = ${round}
       RETURNING student_id
     `;
     if (deleted.length === 0) {

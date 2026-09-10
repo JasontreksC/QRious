@@ -282,7 +282,9 @@ export function SubmittedSurvey({
 
   return (
     <div className="mt-6 pt-5 border-t border-dashed border-[#F0D9DF] text-left">
-      <h3 className="text-sm font-bold text-[#2B1B2E] mb-1">내 접수 정보</h3>
+      <h3 className="text-sm font-bold text-[#2B1B2E] mb-1">
+        {survey.round ? `${survey.round}차 ` : ''}내 접수 정보
+      </h3>
       <p className="text-[11px] text-[#8C7A8E] mb-2">
         {editable ? '마감 전까지 수정할 수 있어요.' : '접수가 마감되어 수정할 수 없어요.'}
       </p>

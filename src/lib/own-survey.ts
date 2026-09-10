@@ -1,7 +1,12 @@
 import type { Sql } from '@/lib/db';
+import {
+  currentRegistrationRound,
+  type RegistrationRound,
+} from '@/lib/deadline';
 
 export type OwnSurvey = {
   student_id: string;
+  round: RegistrationRound;
   name: string;
   phone: string;
   gender: boolean;
@@ -19,25 +24,100 @@ export type OwnSurvey = {
   ex_want: string | null;
 };
 
-export async function loadOwnSurvey(
+export async function listStudentRounds(
   sql: Sql,
   googleSub: string
-): Promise<OwnSurvey | null> {
-  const students = await sql`
-    SELECT
-      s.student_id,
-      s.name,
-      s.phone,
-      s.gender,
-      s.age,
-      s.mbti,
-      s.major_id,
-      m.name AS major
+): Promise<RegistrationRound[]> {
+  const rows = await sql`
+    SELECT round
+    FROM student
+    WHERE google_sub = ${googleSub}
+    ORDER BY round ASC
+  `;
+  return rows
+    .map((row) => Number(row.round))
+    .filter((round): round is RegistrationRound => round === 1 || round === 2);
+}
+
+export async function loadRoundSubmittedAts(
+  sql: Sql,
+  googleSub: string
+): Promise<{ 1: string | null; 2: string | null }> {
+  const rows = await sql`
+    SELECT s.round, MIN(c.consented_at) AS submitted_at
     FROM student s
-    JOIN major m ON m.major_id = s.major_id
+    JOIN consent c ON c.student_id = s.student_id
     WHERE s.google_sub = ${googleSub}
+    GROUP BY s.round
+  `;
+  const result: { 1: string | null; 2: string | null } = { 1: null, 2: null };
+  for (const row of rows) {
+    const round = Number(row.round);
+    if (round !== 1 && round !== 2) continue;
+    const value = row.submitted_at;
+    if (!value) continue;
+    const date = new Date(String(value));
+    if (Number.isNaN(date.getTime())) continue;
+    result[round] = date.toISOString();
+  }
+  return result;
+}
+
+export async function studentHasRoundByEmail(
+  email: string,
+  round: RegistrationRound,
+  sql: Sql
+): Promise<boolean> {
+  const normalized = email.trim().toLowerCase();
+  if (!normalized) return false;
+  const rows = await sql`
+    SELECT 1
+    FROM student
+    WHERE lower(email) = ${normalized} AND round = ${round}
     LIMIT 1
   `;
+  return rows.length > 0;
+}
+
+export async function loadOwnSurvey(
+  sql: Sql,
+  googleSub: string,
+  round: RegistrationRound | null = currentRegistrationRound()
+): Promise<OwnSurvey | null> {
+  const students = round
+    ? await sql`
+        SELECT
+          s.student_id,
+          s.round,
+          s.name,
+          s.phone,
+          s.gender,
+          s.age,
+          s.mbti,
+          s.major_id,
+          m.name AS major
+        FROM student s
+        JOIN major m ON m.major_id = s.major_id
+        WHERE s.google_sub = ${googleSub} AND s.round = ${round}
+        LIMIT 1
+      `
+    : await sql`
+        SELECT
+          s.student_id,
+          s.round,
+          s.name,
+          s.phone,
+          s.gender,
+          s.age,
+          s.mbti,
+          s.major_id,
+          m.name AS major
+        FROM student s
+        JOIN major m ON m.major_id = s.major_id
+        WHERE s.google_sub = ${googleSub}
+        ORDER BY s.round DESC
+        LIMIT 1
+      `;
   const row = students[0];
   if (!row) return null;
 
@@ -80,8 +160,10 @@ export async function loadOwnSurvey(
       `,
     ]);
 
+  const storedRound = Number(row.round);
   return {
     student_id: studentId,
+    round: storedRound === 2 ? 2 : 1,
     name: String(row.name ?? ''),
     phone: String(row.phone ?? ''),
     gender: Boolean(row.gender),
