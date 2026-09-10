@@ -44,8 +44,11 @@ import {
 import { parseStudentDisplayName } from '@/lib/student-name';
 import { StatsBoard } from './stats-board';
 import { DeadlineCountdown, SurveyClosedPage, useSurveyOpen } from './deadline-countdown';
+import { QriousWordmark } from './qrious-wordmark';
 import { SubmittedSurvey } from './submitted-survey';
 import { isSurveyOpen } from '@/lib/deadline';
+import qriousLogo from './icon.png';
+import styles from './y2k-theme.module.css';
 
 const MBTI_OPTIONS = [
   'ISTJ', 'ISFJ', 'INFJ', 'INTJ',
@@ -644,7 +647,20 @@ export default function Home() {
     }`;
 
   return (
-    <div className="min-h-screen bg-[#FBF6F0] text-[#2B1B2E] font-sans pb-[calc(80px+env(safe-area-inset-bottom))]">
+    <div
+      className={`${styles.y2kPage} min-h-screen text-[#2B1B2E] font-sans pb-[calc(80px+env(safe-area-inset-bottom))]`}
+    >
+      <div className={styles.decorScene} aria-hidden="true">
+        <span className={`${styles.orb} ${styles.orbOne}`} />
+        <span className={`${styles.orb} ${styles.orbTwo}`} />
+        <span className={`${styles.sticker} ${styles.onlineSticker}`}>
+          ● ONLINE
+        </span>
+        <span className={`${styles.sticker} ${styles.messageSticker}`}>
+          NEW MESSAGE!
+        </span>
+        <span className={styles.chromeStar}>✦</span>
+      </div>
       {googleSession?.authenticated && (
         <button
           type="button"
@@ -663,8 +679,10 @@ export default function Home() {
           관리자
         </Link>
       )}
-      <div className="max-w-[480px] mx-auto px-4 pt-6 pb-12">
-        <div className="flex items-center justify-center gap-2 mb-5">
+      <div className={`${styles.pageContent} max-w-[480px] mx-auto px-4 pt-6 pb-12`}>
+        <div
+          className={`${styles.schoolBadge} mx-auto flex items-center justify-center gap-2 mb-5`}
+        >
           <Image
             src="/ysu-logo.svg"
             alt="영남대학교"
@@ -677,22 +695,60 @@ export default function Home() {
           </p>
         </div>
         {/* Header */}
-        <div className="text-center mb-8">
-          <div className="relative mx-auto mb-3 h-[120px] w-[120px] sm:h-[140px] sm:w-[140px]">
-            <Image
-              src="/qr-heart.png"
-              alt="QRious"
-              fill
-              priority
-              className="object-contain drop-shadow-sm animate-[pulse_2.4s_ease-in-out_infinite]"
-              sizes="140px"
-            />
+        <div className={`${styles.hero} text-center mb-8`}>
+          <p className={styles.eyebrow}>
+            <span className={styles.statusDot} aria-hidden="true" />
+            YEONSUNG FESTIVAL · 2026
+          </p>
+          <div className={styles.logoStage}>
+            <span
+              className={`${styles.logoSparkle} ${styles.logoSparkleOne}`}
+              aria-hidden="true"
+            >
+              ✦
+            </span>
+            <div className={styles.logoFrame}>
+              <div className={styles.logoInset}>
+                <Image
+                  src={qriousLogo}
+                  alt="QRious"
+                  priority
+                  className={styles.logoImage}
+                />
+              </div>
+            </div>
+            <span
+              className={`${styles.logoSparkle} ${styles.logoSparkleTwo}`}
+              aria-hidden="true"
+            >
+              ★
+            </span>
+            <span className={styles.logoStatus} aria-hidden="true">
+              YOU&apos;VE GOT LOVE!
+            </span>
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-[#E8526A]">
-            QRious - QR 소개팅 <br /> 사전 접수
+          <h1
+            className={styles.heroTitle}
+            aria-label="QRious Y2K 소개팅 사전 접수"
+          >
+            <QriousWordmark />
+            <span className={styles.titleLine}>
+              <span className={styles.titleStar} aria-hidden="true">
+                ★
+              </span>
+              QR 소개팅 사전 접수
+              <span className={styles.titleStar} aria-hidden="true">
+                ★
+              </span>
+            </span>
           </h1>
-          <p className="text-sm text-[#8C7A8E] mt-1.5 leading-relaxed">
-            즐거운 축제를 새 인연과 함께하고 싶으신가요? <br /> 저희가 도와드릴게요!
+          <p className={styles.heroCopy}>
+            새로운 인연에 접속 중...{' '}
+            <span className={styles.heroHeart} aria-hidden="true">
+              ♡
+            </span>
+            <br />
+            축제에서 시작될 우리만의 러브 스토리를 만나보세요!
           </p>
         </div>
 
