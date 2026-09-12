@@ -248,14 +248,14 @@ export default function AdminStudentsPage() {
                             />
                             <p className="text-xs leading-relaxed">
                               <span className="font-semibold text-[#8C7A8E]">
-                                ex_have
+                                매력 · 취미 · 좋아하는 것
                               </span>
                               <br />
                               {student.ex_have || '없음'}
                             </p>
                             <p className="text-xs leading-relaxed">
                               <span className="font-semibold text-[#8C7A8E]">
-                                ex_want
+                                상대의 취미 · 좋아하는 것
                               </span>
                               <br />
                               {student.ex_want || '없음'}

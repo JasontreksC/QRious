@@ -1,6 +1,6 @@
 /** 개인정보 보호법 필수 고지 항목을 담은 동의문 (버전 관리). */
 
-export const CONSENT_VERSION = '2026.09.09-3';
+export const CONSENT_VERSION = '2026.09.12-1';
 
 export const CONSENT_TITLE = '개인정보 수집·이용 동의서';
 
@@ -13,7 +13,7 @@ export const CONSENT_ITEMS =
   '학과, 이름, 학교 구글 계정 이메일, 전화번호, 성별, 나이, 선호 연령 조건, MBTI, 본인 매력 태그(have), 이상형 매력 태그(want)';
 
 export const CONSENT_OPTIONAL_ITEMS =
-  '추가로 어필하고 싶은 매력(기타 매력), 추가로 원하는 이상형(기타 이상형)';
+  '추가로 적어 주시는 자기소개(매력·취미·좋아하는 것 등), 추가로 적어 주시는 이상형(취미·취향 등)';
 
 export const CONSENT_RETENTION =
   '수집된 개인정보는 행사 종료일로부터 14일 이내에 지체 없이 파기합니다. 동의 증빙 기록(동의 여부·시각·동의문 버전)은 분쟁 대응을 위해 행사 종료일로부터 1년간 보관한 뒤 파기합니다.';

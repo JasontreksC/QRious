@@ -539,7 +539,7 @@ export function SubmittedSurvey({
 
       {row(
         'exHave',
-        '추가 매력',
+        '매력 · 취미 · 좋아하는 것',
         survey.ex_have || '없음',
         <textarea
           rows={3}
@@ -592,7 +592,7 @@ export function SubmittedSurvey({
 
       {row(
         'exWant',
-        '추가 이상형',
+        '상대의 취미 · 좋아하는 것',
         survey.ex_want || '없음',
         <textarea
           rows={3}

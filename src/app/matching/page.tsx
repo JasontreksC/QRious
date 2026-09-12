@@ -24,7 +24,7 @@ export default function MatchingGuidePage() {
         <h1 className={styles.matchingTitle}>매칭 시스템</h1>
         <p className={styles.matchingLead}>
           QRious는 제비뽑기처럼 아무나 짝지어 주지 않아요.
-          여러분이 적어 주신 성향, 매력, 그리고 한 줄 이야기를 보고
+          여러분이 적어 주신 성향, 매력, 취미, 좋아하는 것을 보고
           서로 끌릴 가능성이 높은 사람을 찾아요.
           점수는 아래 세 가지를 모아서 계산해요.
         </p>
@@ -83,16 +83,16 @@ export default function MatchingGuidePage() {
         </section>
 
         <section className={styles.matchingSection}>
-          <h2>3. 직접 적어 주신 한 줄</h2>
+          <h2>3. 직접 적어 주신 이야기</h2>
           <p className={styles.matchingCopy}>
-            태그로 다 담기지 않는 이야기는, 추가로 적어 주신 문장으로 봐요.
+            태그로 다 담기지 않는 매력, 취미, 좋아하는 것은 추가로 적어 주신 문장으로 봐요.
             예를 들어 “동물을 좋아하는 사람이 이상형이에요”와
             “강아지를 키워요. 함께 산책하면 즐거울 거예요”처럼요.
           </p>
           <figure className={styles.matchingFigure}>
             <Image
               src="/images/ex_score.png"
-              alt="추가 이상형과 추가 매력을 AI가 다섯 기준으로 비교해 0에서 1 사이 점수로 만드는 그림"
+              alt="상대에게 바라는 이야기와 내가 적어 준 매력·취미·좋아하는 것을 AI가 비교해 점수로 만드는 그림"
               width={1474}
               height={1352}
               sizes="(max-width: 480px) 92vw, 448px"
@@ -118,7 +118,7 @@ export default function MatchingGuidePage() {
           <h2>4. 최종 점수와 매칭표</h2>
           <p className={styles.matchingCopy}>
             앞에서 구한 세 점수를 한 번에 모아요.
-            MBTI : 태그 : 추가 매력/이상형은 1 : 6 : 3으로 섞어요.
+            MBTI : 태그 : 직접 적어 주신 이야기는 1 : 6 : 3으로 섞어요.
             태그가 제일 크고, 직접 적어 주신 이야기가 그다음,
             MBTI는 살짝 참고하는 정도예요.
           </p>

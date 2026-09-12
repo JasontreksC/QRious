@@ -1454,15 +1454,15 @@ export default function Home({
                   htmlFor="exHave"
                   className="flex flex-wrap items-center gap-y-0.5 text-xs font-semibold text-[#8C7A8E] tracking-wider uppercase"
                 >
-                  <span>✨ 추가로 어필하고 싶은 나만의 매력</span>
+                  <span>✨추가로 어필하고싶은 나만의 매력, 취미, 좋아하는 것</span>
                 </label>
                 <p className="text-[11px] text-[#8C7A8E] leading-relaxed -mt-0.5 mb-1">
-                  이거를 작성하면 원하는 상대를 찾는데 도움을 줄 수 있어요.
+                  태그로 다 말하기 어려운 취미나 취향도 적어 주세요. 원하는 상대를 찾는 데 도움이 돼요.
                 </p>
                 <textarea
                   id="exHave"
                   name="exHave"
-                  placeholder="예: 요리 잘해요, 대화가 끊기지 않아요"
+                  placeholder="예: 영화 보는 거 좋아해요, 주말엔 카페 투어해요, 요리 잘해요"
                   rows={3}
                   maxLength={300}
                   value={formData.exHave}
@@ -1547,15 +1547,15 @@ export default function Home({
                   htmlFor="exWant"
                   className="flex flex-wrap items-center gap-y-0.5 text-xs font-semibold text-[#8C7A8E] tracking-wider uppercase"
                 >
-                  <span>💭 추가로 원하는 이상형</span>
+                  <span>💭 추가로 원하는 이상형, 상대의 취미, 좋아하는 것</span>
                 </label>
                 <p className="text-[11px] text-[#8C7A8E] leading-relaxed -mt-0.5 mb-1">
-                  이거를 작성하면 원하는 상대를 찾는데 도움을 줄 수 있어요.
+                  태그엔 없는 이상형, 같이 하고 싶은 취미나 상대가 좋아했으면 하는 것도 적어 주세요.
                 </p>
                 <textarea
                   id="exWant"
                   name="exWant"
-                  placeholder="예: 같이 운동할 사람, 유머 감각 있는 사람"
+                  placeholder="예: 같이 운동할 사람, 카페에서 수다 떠는 거 좋아하는 사람"
                   rows={3}
                   maxLength={300}
                   value={formData.exWant}
