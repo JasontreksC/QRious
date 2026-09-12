@@ -356,8 +356,9 @@ export function getParticipantHomeView({
   }
 
   if (announced1) {
+    // 2차 접수를 안 했어도 1차 결과는 나중에 다시 볼 수 있게 둔다.
+    // 매칭됐으면 /result로 가고, 여기 오면 1차 미매칭이다.
     if (round === 2) return 'unmatched-with-round2';
-    if (now >= eventTimeMs('round2Close', times)) return 'never';
     return 'unmatched';
   }
   return 'submitted';
