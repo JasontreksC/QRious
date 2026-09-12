@@ -11,6 +11,7 @@ import {
   type SurveyPatch,
 } from '@/lib/api';
 import { AGE_PREF_ANY, AGE_PREF_SPECIFIC } from '@/lib/age-pref';
+import { STUDENT_NAME_MAX, STUDENT_NAME_MIN } from '@/lib/student-name';
 
 const MBTI_AXES = [
   { key: 'ei', left: 'E', right: 'I', leftHint: '외향', rightHint: '내향' },
@@ -20,6 +21,7 @@ const MBTI_AXES = [
 ] as const;
 
 type FieldKey =
+  | 'name'
   | 'major'
   | 'phone'
   | 'gender'
@@ -32,6 +34,7 @@ type FieldKey =
   | 'exWant';
 
 type Draft = {
+  name: string;
   major_id: string;
   phone: string;
   gender: boolean;
@@ -54,6 +57,7 @@ function formatKrPhone(digits: string): string {
 
 function toDraft(survey: OwnSurvey): Draft {
   return {
+    name: survey.name,
     major_id: survey.major_id,
     phone: survey.phone,
     gender: survey.gender,
@@ -139,7 +143,22 @@ export function SubmittedSurvey({
     if (!survey || !draft || !editing) return;
 
     let payload: SurveyPatch | null = null;
-    if (editing === 'major') {
+    if (editing === 'name') {
+      const name = draft.name.trim();
+      if (!name) {
+        setFieldError('이름을 입력해 주세요.');
+        return;
+      }
+      if (name.length < STUDENT_NAME_MIN) {
+        setFieldError('이름은 2글자 이상이어야 합니다.');
+        return;
+      }
+      if (name.length > STUDENT_NAME_MAX) {
+        setFieldError('이름은 20글자 이하여야 합니다.');
+        return;
+      }
+      payload = { name };
+    } else if (editing === 'major') {
       if (!draft.major_id) {
         setFieldError('학과를 선택해 주세요.');
         return;
@@ -289,12 +308,23 @@ export function SubmittedSurvey({
         {editable ? '마감 전까지 수정할 수 있어요.' : '접수가 마감되어 수정할 수 없어요.'}
       </p>
 
-      <div className="py-3 border-b border-[#F0D9DF]/80 text-left">
-        <p className="text-[11px] font-semibold tracking-wide text-[#8C7A8E] uppercase">
-          이름
-        </p>
-        <p className="mt-1.5 text-sm font-semibold text-[#2B1B2E]">{survey.name}</p>
-      </div>
+      {row(
+        'name',
+        '이름',
+        <span className="font-semibold">{survey.name}</span>,
+        <input
+          type="text"
+          maxLength={STUDENT_NAME_MAX}
+          autoComplete="name"
+          value={draft?.name ?? ''}
+          onChange={(e) =>
+            setDraft((prev) =>
+              prev ? { ...prev, name: e.target.value } : prev
+            )
+          }
+          className="w-full px-3 py-2 border border-[#F0D9DF] rounded-xl bg-[#FDE8EC] text-[15px] outline-none focus:border-[#E8526A] focus:bg-white"
+        />
+      )}
 
       {row(
         'major',

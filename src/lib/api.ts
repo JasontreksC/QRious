@@ -70,6 +70,7 @@ export type SurveyStats = {
 };
 
 export type SurveyPayload = {
+  name: string;
   phone: string;
   gender: boolean;
   age: number;
@@ -122,6 +123,7 @@ export type MatchPartner = {
 };
 
 export type SurveyPatch = {
+  name?: string;
   phone?: string;
   gender?: boolean;
   age?: number;

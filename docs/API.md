@@ -191,13 +191,14 @@ OAuth 콜백이 실패하면 JSON 대신 홈으로 리다이렉트하며 `?error
 ## 4. POST `/api/surveys`
 
 `qrious_google` 세션이 없으면 `401 UNAUTHORIZED`입니다.  
-이름은 세션의 구글 표시 이름에서 `성함(학생)`만 파싱해 저장합니다. `student_id`는 서버 UUID입니다.  
+구글 표시 이름이 `성함(학생)`이 아니면 `403 NOT_STUDENT`입니다. 저장되는 이름은 요청 본문의 `name`입니다. `student_id`는 서버 UUID입니다.  
 접수 마감은 **2026-10-15 00:00 KST**이며, 이후 POST/PATCH/DELETE는 `403 DEADLINE`입니다.
 
 ### Request body
 
 | 필드 | 타입 | 필수 | ERD |
 |------|------|------|-----|
+| `name` | string | O | `student.name` — 2~20자 |
 | `phone` | string | O | `student.phone` |
 | `gender` | boolean | O | `student.gender` |
 | `age` | integer | O | `student.age` |
@@ -260,9 +261,9 @@ OAuth 콜백이 실패하면 JSON 대신 홈으로 리다이렉트하며 `?error
 
 본인 접수의 일부 필드만 수정합니다. 보낸 키만 갱신합니다.
 
-허용 키: `phone`, `gender`, `age`, `major_id`, `mbti`, `age_pref_ids`, `have_charm_ids`, `want_charm_ids`, `ex_have`, `ex_want`.
+허용 키: `name`, `phone`, `gender`, `age`, `major_id`, `mbti`, `age_pref_ids`, `have_charm_ids`, `want_charm_ids`, `ex_have`, `ex_want`.
 
-이름은 구글 계정에서 오기 때문에 수정할 수 없습니다. 성공 시 GET과 같은 본문을 반환합니다.
+성공 시 GET과 같은 본문을 반환합니다.
 
 `DELETE /api/surveys`는 같은 구글 세션의 접수를 취소합니다 (`google_sub`로 `student` 삭제, consent는 유지).
 

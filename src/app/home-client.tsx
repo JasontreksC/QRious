@@ -41,7 +41,11 @@ import {
   AGE_PREF_SPECIFIC,
   type AgePrefSpecificId,
 } from '@/lib/age-pref';
-import { parseStudentDisplayName } from '@/lib/student-name';
+import {
+  parseStudentDisplayName,
+  STUDENT_NAME_MAX,
+  STUDENT_NAME_MIN,
+} from '@/lib/student-name';
 import { StatsBoard } from './stats-board';
 import { DeadlineCountdown, Round1ResultAndRound2OpenNotice, SurveyClosedPage, UnmatchedPage, useNow, useRegistrationRound, useSurveyOpen } from './deadline-countdown';
 import { QriousWordmark } from './qrious-wordmark';
@@ -395,7 +399,7 @@ export default function Home({
           if (session.submitted) setSubmitted(true);
           setFormData((prev) => ({
             ...prev,
-            name: displayName,
+            name: prev.name || displayName,
           }));
         } else {
           setGoogleSession(session);
@@ -420,8 +424,9 @@ export default function Home({
         return '';
       case 'name': {
         const v = typeof value === 'string' ? value.trim() : '';
-        if (!v) return '구글 계정에서 이름을 불러오지 못했습니다.';
-        if (v.length < 2) return '이름은 2글자 이상이어야 합니다.';
+        if (!v) return '이름을 입력해 주세요.';
+        if (v.length < STUDENT_NAME_MIN) return '이름은 2글자 이상이어야 합니다.';
+        if (v.length > STUDENT_NAME_MAX) return '이름은 20글자 이하여야 합니다.';
         return '';
       }
       case 'major': {
@@ -634,6 +639,7 @@ export default function Home({
       const exWant = formData.exWant.trim();
 
       await submitSurvey({
+        name: formData.name.trim(),
         phone: formData.phone.trim(),
         gender: formData.gender as boolean,
         age: Number(formData.age),
@@ -1042,11 +1048,29 @@ export default function Home({
                     type="text"
                     id="name"
                     name="name"
-                    readOnly
+                    placeholder="실명을 입력해 주세요"
+                    maxLength={STUDENT_NAME_MAX}
+                    autoComplete="name"
                     value={formData.name}
-                    className={`${getInputClass('name')} pr-12 bg-[#F7F0F2] text-[#8C7A8E] cursor-not-allowed`}
+                    onChange={handleChange}
+                    onBlur={handleBlur}
+                    className={`${getInputClass('name')} pr-12`}
                   />
+                  {touched.name && (
+                    <span
+                      className={`absolute right-4 top-1/2 -translate-y-1/2 font-bold text-lg pointer-events-none transition-all duration-200 ${
+                        errors.name ? 'text-[#E8526A]' : 'text-[#4CAF82]'
+                      }`}
+                    >
+                      {errors.name ? '✕' : '✓'}
+                    </span>
+                  )}
                 </div>
+                <p
+                  className={`text-xs leading-relaxed transition-all duration-150 ${getHintDetails('name').style}`}
+                >
+                  {getHintDetails('name').text}
+                </p>
               </div>
 
               {/* Major */}

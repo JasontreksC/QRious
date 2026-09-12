@@ -27,7 +27,10 @@ import { getSql } from '@/lib/db';
 import { getSessionFromRequest } from '@/lib/google-auth';
 import { isUniqueViolation, jsonError } from '@/lib/http';
 import { loadOwnSurvey } from '@/lib/own-survey';
-import { parseStudentDisplayName } from '@/lib/student-name';
+import {
+  parseStudentDisplayName,
+  parseSubmittedName,
+} from '@/lib/student-name';
 
 export const runtime = 'nodejs';
 
@@ -42,6 +45,7 @@ const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 type SurveyBody = {
+  name?: unknown;
   phone?: unknown;
   gender?: unknown;
   age?: unknown;
@@ -125,8 +129,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const name = parseStudentDisplayName(googleUser.name);
-  if (!name) {
+  if (!parseStudentDisplayName(googleUser.name)) {
     return jsonError(403, 'NOT_STUDENT', '학생만 참가할 수 있습니다.');
   }
 
@@ -145,6 +148,7 @@ export async function POST(req: NextRequest) {
   }
 
   const studentId = randomUUID();
+  const name = parseSubmittedName(body.name);
   const majorId =
     asTrimmedString(body.major_id) ?? asTrimmedString(body.major);
   const phoneRaw = asTrimmedString(body.phone);
@@ -158,6 +162,9 @@ export async function POST(req: NextRequest) {
   const exWant =
     typeof body.ex_want === 'string' ? body.ex_want.trim() : '';
 
+  if (!name) {
+    return jsonError(400, 'VALIDATION_ERROR', '이름을 올바르게 입력해 주세요.');
+  }
   if (!majorId) {
     return jsonError(400, 'VALIDATION_ERROR', '학과를 선택해 주세요.');
   }
@@ -460,6 +467,7 @@ export async function PATCH(req: NextRequest) {
     Object.prototype.hasOwnProperty.call(body, key);
 
   if (
+    !has('name') &&
     !has('phone') &&
     !has('gender') &&
     !has('age') &&
@@ -489,6 +497,20 @@ export async function PATCH(req: NextRequest) {
     }
 
     const queries = [];
+
+    if (has('name')) {
+      const name = parseSubmittedName(body.name);
+      if (!name) {
+        return jsonError(
+          400,
+          'VALIDATION_ERROR',
+          '이름을 올바르게 입력해 주세요.'
+        );
+      }
+      queries.push(sql`
+        UPDATE student SET name = ${name} WHERE student_id = ${studentId}
+      `);
+    }
 
     if (has('phone')) {
       const phoneRaw = asTrimmedString(body.phone);
