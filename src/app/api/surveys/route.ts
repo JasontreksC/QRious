@@ -22,6 +22,7 @@ import {
   THIRD_PARTY_RETENTION,
 } from '@/lib/consent';
 import { currentRegistrationRound } from '@/lib/deadline';
+import { loadEventTimes } from '@/lib/event-schedule';
 import { getSql } from '@/lib/db';
 import { getSessionFromRequest } from '@/lib/google-auth';
 import { isUniqueViolation, jsonError } from '@/lib/http';
@@ -90,7 +91,12 @@ export async function GET(req: NextRequest) {
 
   try {
     const sql = getSql();
-    const survey = await loadOwnSurvey(sql, googleUser.sub);
+    const times = await loadEventTimes(sql);
+    const survey = await loadOwnSurvey(
+      sql,
+      googleUser.sub,
+      currentRegistrationRound(Date.now(), times)
+    );
     if (!survey) {
       return jsonError(404, 'NOT_FOUND', '접수 내역이 없습니다.');
     }
@@ -124,7 +130,9 @@ export async function POST(req: NextRequest) {
     return jsonError(403, 'NOT_STUDENT', '학생만 참가할 수 있습니다.');
   }
 
-  const round = currentRegistrationRound();
+  const sql = getSql();
+  const times = await loadEventTimes(sql);
+  const round = currentRegistrationRound(Date.now(), times);
   if (round == null) {
     return jsonError(403, 'DEADLINE', '접수가 마감되었습니다.');
   }
@@ -231,7 +239,6 @@ export async function POST(req: NextRequest) {
   const age = body.age;
 
   try {
-    const sql = getSql();
     const allCharmIds = [...new Set([...haveCharmIds, ...wantCharmIds])];
 
     const existing = await sql`
@@ -435,7 +442,9 @@ export async function PATCH(req: NextRequest) {
     );
   }
 
-  const round = currentRegistrationRound();
+  const roundSql = getSql();
+  const times = await loadEventTimes(roundSql);
+  const round = currentRegistrationRound(Date.now(), times);
   if (round == null) {
     return jsonError(403, 'DEADLINE', '접수가 마감되었습니다.');
   }
@@ -467,7 +476,7 @@ export async function PATCH(req: NextRequest) {
   }
 
   try {
-    const sql = getSql();
+    const sql = roundSql;
     const existing = await sql`
       SELECT student_id
       FROM student
@@ -668,7 +677,7 @@ export async function PATCH(req: NextRequest) {
       await sql.transaction(queries);
     }
 
-    const survey = await loadOwnSurvey(sql, googleUser.sub);
+    const survey = await loadOwnSurvey(sql, googleUser.sub, round);
     if (!survey) {
       return jsonError(404, 'NOT_FOUND', '접수 내역이 없습니다.');
     }
@@ -697,13 +706,14 @@ export async function DELETE(req: NextRequest) {
     );
   }
 
-  const round = currentRegistrationRound();
+  const sql = getSql();
+  const times = await loadEventTimes(sql);
+  const round = currentRegistrationRound(Date.now(), times);
   if (round == null) {
     return jsonError(403, 'DEADLINE', '접수가 마감되었습니다.');
   }
 
   try {
-    const sql = getSql();
     const deleted = await sql`
       DELETE FROM student
       WHERE google_sub = ${googleUser.sub} AND round = ${round}

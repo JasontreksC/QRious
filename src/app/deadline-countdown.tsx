@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useEventTimes } from './event-times-context';
 import {
   currentRegistrationRound,
   formatDeadlineRemaining,
@@ -53,9 +54,10 @@ export function useNow(intervalMs = 1000): number {
 
 export function DeadlineCountdown() {
   const now = useNow();
-  const items = getScheduleView(now);
+  const times = useEventTimes();
+  const items = getScheduleView(now, times);
   const lines = groupScheduleLines(items);
-  const clock = formatDeadlineRemaining(msUntilNextSchedule(now));
+  const clock = formatDeadlineRemaining(msUntilNextSchedule(now, times));
 
   return (
     <div className="text-center mb-8 -mt-1 space-y-1">
@@ -121,8 +123,10 @@ export function SurveyClosedPage({
 }: {
   hasSurvey?: boolean;
 }) {
+  const now = useNow();
+  const times = useEventTimes();
   const copy = hasSurvey
-    ? getSurveyClosedCopy()
+    ? getSurveyClosedCopy(now, times)
     : {
         title: '매칭 결과 없음',
         body: '접수한 적이 없어 매칭 결과가 없어요.',
@@ -181,10 +185,12 @@ export function UnmatchedPage({
 
 export function useSurveyOpen(): boolean {
   const now = useNow();
-  return isSurveyOpen(now);
+  const times = useEventTimes();
+  return isSurveyOpen(now, times);
 }
 
 export function useRegistrationRound() {
   const now = useNow();
-  return currentRegistrationRound(now);
+  const times = useEventTimes();
+  return currentRegistrationRound(now, times);
 }

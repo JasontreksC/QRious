@@ -1,6 +1,7 @@
 import type { Sql } from '@/lib/db';
 import { getSql } from '@/lib/db';
-import { eventTimeMs } from '@/lib/deadline';
+import { eventTimeMs, type EventTimes } from '@/lib/deadline';
+import { loadEventTimes } from '@/lib/event-schedule';
 
 export type MatchPartner = {
   round: 1 | 2;
@@ -23,13 +24,15 @@ export function shouldShowMatchResult({
   hasMatchRound2,
   hasAnyMatch,
   now = Date.now(),
+  times,
 }: {
   hasRound2: boolean;
   hasMatchRound2: boolean;
   hasAnyMatch: boolean;
   now?: number;
+  times: EventTimes;
 }): boolean {
-  if (hasRound2 && now >= eventTimeMs('round2Announce')) return hasMatchRound2;
+  if (hasRound2 && now >= eventTimeMs('round2Announce', times)) return hasMatchRound2;
   return hasAnyMatch;
 }
 
@@ -141,6 +144,7 @@ export async function studentHasMatchByEmail(
   const normalized = normalizeEmail(email);
   if (!normalized) return false;
 
+  const times = await loadEventTimes(sql);
   const rounds = await studentRoundsByEmail(email, sql);
   const matchRows = await sql`
     SELECT me.round
@@ -160,6 +164,7 @@ export async function studentHasMatchByEmail(
     hasMatchRound2: matchRounds.has(2),
     hasAnyMatch: matchRounds.size > 0,
     now,
+    times,
   });
 }
 
@@ -169,9 +174,10 @@ export async function loadMatchPartnerByEmail(
   sql: Sql = getSql(),
   now = Date.now()
 ): Promise<MatchPartner | null> {
+  const times = await loadEventTimes(sql);
   const rounds = await studentRoundsByEmail(email, sql);
   const restrictToRound2 =
-    rounds.includes(2) && now >= eventTimeMs('round2Announce');
+    rounds.includes(2) && now >= eventTimeMs('round2Announce', times);
   const rows = await loadMatchRows(
     email,
     sql,

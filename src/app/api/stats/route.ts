@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { statsRound } from '@/lib/deadline';
+import { loadEventTimes } from '@/lib/event-schedule';
 import { getSql } from '@/lib/db';
 import { jsonError } from '@/lib/http';
 
@@ -8,7 +9,8 @@ export const runtime = 'nodejs';
 export async function GET() {
   try {
     const sql = getSql();
-    const round = statsRound();
+    const times = await loadEventTimes(sql);
+    const round = statsRound(Date.now(), times);
     const rows = await sql`
       SELECT
         COUNT(*)::int AS total,

@@ -1,3 +1,4 @@
+import type { EventTimes } from '@/lib/deadline';
 import type { Major } from '@/lib/majors';
 
 export class ApiError extends Error {
@@ -217,11 +218,58 @@ export async function logoutGoogle(): Promise<void> {
   await request<{ ok: boolean }>('/api/auth/logout', { method: 'POST' });
 }
 
+export type DailyStatPoint = {
+  date: string;
+  label: string;
+  fullLabel: string;
+  round1: number;
+  round2: number;
+  total: number;
+  cumulative: number;
+  cumulativeRound1: number;
+  cumulativeRound2: number;
+};
+
+export type AdminDailyStats = {
+  days: DailyStatPoint[];
+  totals: {
+    all: number;
+    round1: number;
+    round2: number;
+  };
+};
+
 export async function getAdminStudents(): Promise<AdminStudent[]> {
   const data = await request<{ students: AdminStudent[] }>(
     '/api/admin/students'
   );
   return data.students ?? [];
+}
+
+export async function getAdminDailyStats(): Promise<AdminDailyStats> {
+  return request<AdminDailyStats>('/api/admin/stats/daily', {
+    cache: 'no-store',
+  });
+}
+
+export type { EventTimes };
+
+export type AdminSchedule = {
+  times: EventTimes;
+  defaults: EventTimes;
+};
+
+export async function getAdminSchedule(): Promise<AdminSchedule> {
+  return request<AdminSchedule>('/api/admin/schedule', { cache: 'no-store' });
+}
+
+export async function saveAdminSchedule(
+  times: EventTimes
+): Promise<AdminSchedule> {
+  return request<AdminSchedule>('/api/admin/schedule', {
+    method: 'PUT',
+    body: JSON.stringify({ times }),
+  });
 }
 
 export async function createCharm(name: string): Promise<Charm> {

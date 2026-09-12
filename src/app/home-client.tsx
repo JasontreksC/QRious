@@ -47,7 +47,8 @@ import { DeadlineCountdown, Round1ResultAndRound2OpenNotice, SurveyClosedPage, U
 import { QriousWordmark } from './qrious-wordmark';
 import { SiteHeader } from './site-header';
 import { SubmittedSurvey } from './submitted-survey';
-import { EVENT_TIMES, formatKstMonthDayTime, getHeroTitlePlaques, getParticipantHomeView, isAwaitingAnnouncement, isRound1ResultAndRound2Open, isSurveyOpen, shouldShowGoogleLogin, roundLabel } from '@/lib/deadline';
+import { useEventTimes } from './event-times-context';
+import { formatKstMonthDayTime, getHeroTitlePlaques, getParticipantHomeView, isAwaitingAnnouncement, isRound1ResultAndRound2Open, isSurveyOpen, shouldShowGoogleLogin, roundLabel } from '@/lib/deadline';
 import qriousLogo from './icon.png';
 import styles from './y2k-theme.module.css';
 
@@ -200,6 +201,7 @@ export default function Home({
 }: {
   applyRound2?: boolean;
 }) {
+  const times = useEventTimes();
   const [formData, setFormData] = useState<FormData>(initialFormData);
 
   const [mbtiAxes, setMbtiAxes] = useState<MbtiAxes>(initialMbtiAxes);
@@ -254,7 +256,7 @@ export default function Home({
     null
   );
   const [authLoading, setAuthLoading] = useState(
-    () => !isAwaitingAnnouncement()
+    () => !isAwaitingAnnouncement(Date.now(), times)
   );
   const [loggingOut, setLoggingOut] = useState(false);
   const [cancelling, setCancelling] = useState(false);
@@ -262,10 +264,10 @@ export default function Home({
   const surveyOpen = useSurveyOpen();
   const registrationRound = useRegistrationRound();
   const now = useNow();
-  const awaitingAnnouncement = isAwaitingAnnouncement(now);
-  const showGoogleLogin = shouldShowGoogleLogin(now);
-  const round1ResultAndRound2Open = isRound1ResultAndRound2Open(now);
-  const heroPlaques = getHeroTitlePlaques(now);
+  const awaitingAnnouncement = isAwaitingAnnouncement(now, times);
+  const showGoogleLogin = shouldShowGoogleLogin(now, times);
+  const round1ResultAndRound2Open = isRound1ResultAndRound2Open(now, times);
+  const heroPlaques = getHeroTitlePlaques(now, times);
   const previousRound1 =
     googleSession?.authenticated === true &&
     googleSession.rounds.includes(1);
@@ -275,6 +277,7 @@ export default function Home({
           rounds: googleSession.rounds,
           applyRound2,
           now,
+          times,
         })
       : null;
   const displayRound =
@@ -619,7 +622,7 @@ export default function Home({
       return;
     }
 
-    if (!isSurveyOpen()) {
+    if (!isSurveyOpen(Date.now(), times)) {
       triggerToast('⚠️ 접수가 마감되었습니다.');
       return;
     }
@@ -959,8 +962,8 @@ export default function Home({
               <div className="mt-4 rounded-xl border border-[#F0D9DF] bg-[#FDE8EC] px-4 py-3.5">
                 <p className="text-[15px] font-bold text-[#E8526A] leading-relaxed">
                   {displayRound === 2
-                    ? `2차 매칭 발표는 ${formatKstMonthDayTime(EVENT_TIMES.round2Announce)}예요.`
-                    : `1차 매칭 발표는 ${formatKstMonthDayTime(EVENT_TIMES.round1Announce)}예요.`}
+                    ? `2차 매칭 발표는 ${formatKstMonthDayTime(times.round2Announce)}예요.`
+                    : `1차 매칭 발표는 ${formatKstMonthDayTime(times.round1Announce)}예요.`}
                   <br /><br />
                   매칭 결과 발표 일시에 문자로 알림을 발송드릴 예정이에요.
                   <br />

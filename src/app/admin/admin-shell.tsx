@@ -7,6 +7,8 @@ import { getGoogleSession, type GoogleAuthSession } from '@/lib/api';
 
 const TABS = [
   { href: '/admin/students', label: '참가자 목록' },
+  { href: '/admin/stats', label: '일별 통계' },
+  { href: '/admin/schedule', label: '일정' },
   { href: '/admin/charms', label: 'Charm 태그' },
 ] as const;
 
@@ -83,7 +85,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
                   <Link
                     key={tab.href}
                     href={tab.href}
-                    className={`flex-1 text-center py-2.5 rounded-xl text-sm font-bold transition-colors ${
+                    className={`flex-1 text-center py-2.5 rounded-xl text-xs sm:text-sm font-bold whitespace-nowrap transition-colors ${
                       active
                         ? 'bg-[#E8526A] text-white shadow-sm'
                         : 'text-[#8C7A8E] hover:bg-[#FDE8EC]'

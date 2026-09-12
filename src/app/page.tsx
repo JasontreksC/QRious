@@ -1,7 +1,10 @@
 import { redirect } from 'next/navigation';
+import { EventTimesProvider } from './event-times-context';
 import { currentRegistrationRound, isAwaitingAnnouncement } from '@/lib/deadline';
+import { loadEventTimes } from '@/lib/event-schedule';
 import { getSessionFromCookies } from '@/lib/google-auth';
 import { studentHasMatchByEmail } from '@/lib/match-result';
+import { getSql } from '@/lib/db';
 import Home from './home-client';
 
 export default async function HomePage({
@@ -9,20 +12,30 @@ export default async function HomePage({
 }: {
   searchParams: Promise<{ apply?: string }>;
 }) {
-  if (isAwaitingAnnouncement()) {
-    return <Home applyRound2={false} />;
+  const times = await loadEventTimes();
+
+  if (isAwaitingAnnouncement(Date.now(), times)) {
+    return (
+      <EventTimesProvider times={times}>
+        <Home applyRound2={false} />
+      </EventTimesProvider>
+    );
   }
 
   const session = await getSessionFromCookies();
   const { apply } = await searchParams;
-  const applyRound2 = apply === '2' && currentRegistrationRound() === 2;
+  const applyRound2 =
+    apply === '2' && currentRegistrationRound(Date.now(), times) === 2;
 
-  if (
-    session &&
-    !applyRound2 &&
-    (await studentHasMatchByEmail(session.email))
-  ) {
-    redirect('/result');
+  if (session && !applyRound2) {
+    const sql = getSql();
+    if (await studentHasMatchByEmail(session.email, sql)) {
+      redirect('/result');
+    }
   }
-  return <Home applyRound2={applyRound2} />;
+  return (
+    <EventTimesProvider times={times}>
+      <Home applyRound2={applyRound2} />
+    </EventTimesProvider>
+  );
 }
