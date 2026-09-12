@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Bagel_Fat_One, Geist, Geist_Mono, Jua } from "next/font/google";
 import localFont from "next/font/local";
+import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -66,7 +67,10 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} ${y2kDisplay.variable} ${y2kBubble.variable} ${audioNugget.variable} ${fluxDemo.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        {children}
+        <Analytics />
+      </body>
     </html>
   );
 }
