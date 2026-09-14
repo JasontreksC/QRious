@@ -159,7 +159,8 @@ export function buildGoogleAuthorizeUrl(params: {
   url.searchParams.set('state', params.state);
   url.searchParams.set('code_challenge', params.challenge);
   url.searchParams.set('code_challenge_method', 'S256');
-  url.searchParams.set('hd', SCHOOL_HOSTED_DOMAIN);
+  // hd를 넣으면 구글이 이메일 입력 없이 학교 SSO로 바로 보내, 모바일에서 흰 화면이 납니다.
+  // 계정 선택·이메일 입력 뒤에 SSO가 타도록 하고, 학교 메일은 콜백에서 검사합니다.
   url.searchParams.set('prompt', 'select_account');
   return url.toString();
 }

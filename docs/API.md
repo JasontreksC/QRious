@@ -175,7 +175,7 @@ OAuth 콜백이 실패하면 JSON 대신 홈으로 리다이렉트하며 `?error
 
 ## 3. 구글 로그인
 
-학교 Workspace 계정만 허용합니다 (`hd=yeonsung.ac.kr`, 이메일이 `@yeonsung.ac.kr`로 끝나야 함). PKCE + `openid email profile`.
+학교 Workspace 계정만 허용합니다 (이메일이 `@yeonsung.ac.kr`로 끝나야 함). PKCE + `openid email profile`. 구글 인가 URL에 `hd`는 넣지 않습니다. 넣으면 이메일 입력 없이 학교 SSO로 바로 가 모바일에서 멈추는 경우가 있습니다.
 
 | 메서드 | 경로 | 설명 |
 |--------|------|------|

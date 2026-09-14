@@ -18,7 +18,7 @@ function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
 }
 
-/** 2차 발표 이후에는 2차 매칭만 결과로 인정합니다. 그 전에는 있는 매칭을 보여 줍니다. */
+/** 2차 접수한 사람은 1차 매칭을 무시합니다. 2차 발표 후에만 2차 매칭을 보여 줍니다. */
 export function shouldShowMatchResult({
   hasRound2,
   hasMatchRound2,
@@ -32,7 +32,10 @@ export function shouldShowMatchResult({
   now?: number;
   times: EventTimes;
 }): boolean {
-  if (hasRound2 && now >= eventTimeMs('round2Announce', times)) return hasMatchRound2;
+  if (hasRound2) {
+    if (now >= eventTimeMs('round2Announce', times)) return hasMatchRound2;
+    return false;
+  }
   return hasAnyMatch;
 }
 
@@ -168,7 +171,7 @@ export async function studentHasMatchByEmail(
   });
 }
 
-/** 화면에 보여줄 매칭. 2차 발표 후 2차 접수가 있으면 2차 매칭만 반환합니다. */
+/** 화면에 보여줄 매칭. 2차 접수가 있으면 2차 발표 전에는 숨기고, 이후에는 2차 매칭만 반환합니다. */
 export async function loadMatchPartnerByEmail(
   email: string,
   sql: Sql = getSql(),
@@ -176,13 +179,10 @@ export async function loadMatchPartnerByEmail(
 ): Promise<MatchPartner | null> {
   const times = await loadEventTimes(sql);
   const rounds = await studentRoundsByEmail(email, sql);
-  const restrictToRound2 =
-    rounds.includes(2) && now >= eventTimeMs('round2Announce', times);
-  const rows = await loadMatchRows(
-    email,
-    sql,
-    restrictToRound2 ? 2 : null
-  );
+  const hasRound2 = rounds.includes(2);
+  const announced2 = now >= eventTimeMs('round2Announce', times);
+  if (hasRound2 && !announced2) return null;
+  const rows = await loadMatchRows(email, sql, hasRound2 ? 2 : null);
   const row = rows[0];
   if (!row) return null;
   return partnerFromRow(sql, row);

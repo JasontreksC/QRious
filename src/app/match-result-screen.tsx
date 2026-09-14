@@ -137,7 +137,7 @@ export function MatchResultScreen({
             </div>
           ) : null}
           <p className={styles.resultNote}>
-            매칭된 상대방과 컴소과 주점에 와서 이 페이지를 보여주면 할인해드려요!
+            매칭된 상대방과 컴소과 주점에 오시면 특별한 서비스를 드려요!
           </p>
         </div>
         </div>

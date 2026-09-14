@@ -351,6 +351,7 @@ export function getParticipantHomeView({
   }
 
   if (has2) {
+    // 2차 접수자는 1차 결과를 보지 않는다. 발표 전에는 접수 완료, 이후 미매칭만 여기로 온다.
     if (announced2) return 'unmatched';
     return 'submitted';
   }
