@@ -31,7 +31,6 @@ export async function GET(req: NextRequest) {
     sheet.columns = [
       { header: '이름', key: 'name', width: 12 },
       { header: '차수', key: 'round', width: 8 },
-      { header: '이메일', key: 'email', width: 28 },
       { header: '학과', key: 'major', width: 22 },
       { header: '전화번호', key: 'phone', width: 16 },
       { header: '성별', key: 'gender', width: 8 },
@@ -56,7 +55,6 @@ export async function GET(req: NextRequest) {
       sheet.addRow({
         name: s.name,
         round: `${s.round}차`,
-        email: s.email ?? '',
         major: s.major ?? '',
         phone: s.phone,
         gender: s.gender ? '여자' : '남자',

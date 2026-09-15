@@ -24,13 +24,16 @@ import {
 import { currentRegistrationRound } from '@/lib/deadline';
 import { loadEventTimes } from '@/lib/event-schedule';
 import { getSql } from '@/lib/db';
-import { getSessionFromRequest } from '@/lib/google-auth';
 import { isUniqueViolation, jsonError } from '@/lib/http';
 import { loadOwnSurvey } from '@/lib/own-survey';
+import { formatKrPhone, isValidKrPhone, nameKey, phoneDigits } from '@/lib/phone';
 import {
-  parseStudentDisplayName,
-  parseSubmittedName,
-} from '@/lib/student-name';
+  SESSION_COOKIE,
+  encodeSession,
+  getSessionFromRequest,
+  sessionCookieOptions,
+} from '@/lib/session';
+import { parseSubmittedName } from '@/lib/student-name';
 
 export const runtime = 'nodejs';
 
@@ -77,28 +80,24 @@ function asCharmIds(value: unknown): string[] | null {
   return [...new Set(ids)];
 }
 
-function requireGoogleUser(req: NextRequest) {
-  const googleUser = getSessionFromRequest(req);
-  if (!googleUser) {
-    return jsonError(
-      401,
-      'UNAUTHORIZED',
-      '학교 구글 계정으로 로그인해 주세요.'
-    );
+function requireSession(req: NextRequest) {
+  const session = getSessionFromRequest(req);
+  if (!session) {
+    return jsonError(401, 'UNAUTHORIZED', '이름과 전화번호로 로그인해 주세요.');
   }
-  return googleUser;
+  return session;
 }
 
 export async function GET(req: NextRequest) {
-  const googleUser = requireGoogleUser(req);
-  if (googleUser instanceof NextResponse) return googleUser;
+  const session = requireSession(req);
+  if (session instanceof NextResponse) return session;
 
   try {
     const sql = getSql();
     const times = await loadEventTimes(sql);
     const survey = await loadOwnSurvey(
       sql,
-      googleUser.sub,
+      session,
       currentRegistrationRound(Date.now(), times)
     );
     if (!survey) {
@@ -120,17 +119,9 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const googleUser = getSessionFromRequest(req);
-  if (!googleUser) {
-    return jsonError(
-      401,
-      'UNAUTHORIZED',
-      '학교 구글 계정으로 로그인해 주세요.'
-    );
-  }
-
-  if (!parseStudentDisplayName(googleUser.name)) {
-    return jsonError(403, 'NOT_STUDENT', '학생만 참가할 수 있습니다.');
+  const session = getSessionFromRequest(req);
+  if (!session) {
+    return jsonError(401, 'UNAUTHORIZED', '이름과 전화번호로 로그인해 주세요.');
   }
 
   const sql = getSql();
@@ -148,11 +139,10 @@ export async function POST(req: NextRequest) {
   }
 
   const studentId = randomUUID();
-  const name = parseSubmittedName(body.name);
+  const name = parseSubmittedName(body.name) ?? parseSubmittedName(session.name);
   const majorId =
     asTrimmedString(body.major_id) ?? asTrimmedString(body.major);
-  const phoneRaw = asTrimmedString(body.phone);
-  const phoneDigits = phoneRaw ? phoneRaw.replace(/\D/g, '') : '';
+  const phoneRaw = asTrimmedString(body.phone) ?? session.phone;
   const mbti = asTrimmedString(body.mbti)?.toUpperCase() ?? null;
   const haveCharmIds = asCharmIds(body.have_charm_ids);
   const wantCharmIds = asCharmIds(body.want_charm_ids);
@@ -168,13 +158,10 @@ export async function POST(req: NextRequest) {
   if (!majorId) {
     return jsonError(400, 'VALIDATION_ERROR', '학과를 선택해 주세요.');
   }
-  if (!/^01[016789]\d{7,8}$/.test(phoneDigits)) {
+  if (!isValidKrPhone(phoneRaw)) {
     return jsonError(400, 'VALIDATION_ERROR', '전화번호를 올바르게 입력해 주세요.');
   }
-  const phone =
-    phoneDigits.length === 11
-      ? `${phoneDigits.slice(0, 3)}-${phoneDigits.slice(3, 7)}-${phoneDigits.slice(7)}`
-      : `${phoneDigits.slice(0, 3)}-${phoneDigits.slice(3, 6)}-${phoneDigits.slice(6)}`;
+  const phone = formatKrPhone(phoneRaw);
   if (typeof body.gender !== 'boolean') {
     return jsonError(400, 'VALIDATION_ERROR', '성별을 선택해 주세요.');
   }
@@ -261,16 +248,18 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const duplicateGoogle = await sql`
+    const duplicateStudent = await sql`
       SELECT student_id
       FROM student
-      WHERE google_sub = ${googleUser.sub} AND round = ${round}
+      WHERE lower(btrim(name)) = ${nameKey(name)}
+        AND regexp_replace(phone, '[^0-9]', '', 'g') = ${phoneDigits(phone)}
+        AND round = ${round}
       LIMIT 1
     `;
-    if (duplicateGoogle.length > 0) {
+    if (duplicateStudent.length > 0) {
       return jsonError(
         409,
-        'DUPLICATE_GOOGLE',
+        'DUPLICATE_STUDENT',
         `이미 ${round}차 접수를 완료했습니다.`
       );
     }
@@ -300,10 +289,10 @@ export async function POST(req: NextRequest) {
 
     const queries = [
       sql`
-        INSERT INTO student (student_id, name, phone, gender, age, mbti, google_sub, email, major_id, round)
+        INSERT INTO student (student_id, name, phone, gender, age, mbti, major_id, round)
         VALUES (
           ${studentId}, ${name}, ${phone}, ${gender}, ${age}, ${mbti},
-          ${googleUser.sub}, ${googleUser.email}, ${majorId}, ${round}
+          ${majorId}, ${round}
         )
       `,
       ...agePrefIds.map(
@@ -417,13 +406,16 @@ export async function POST(req: NextRequest) {
 
     await sql.transaction(queries);
 
-    return NextResponse.json({ student_id: studentId }, { status: 201 });
+    const res = NextResponse.json({ student_id: studentId }, { status: 201 });
+    const token = encodeSession({ name, phone });
+    if (token) res.cookies.set(SESSION_COOKIE, token, sessionCookieOptions());
+    return res;
   } catch (err) {
     console.error('POST /api/surveys', err);
     if (isUniqueViolation(err)) {
       return jsonError(
         409,
-        'DUPLICATE_GOOGLE',
+        'DUPLICATE_STUDENT',
         '이미 이번 차수에 접수했습니다.'
       );
     }
@@ -440,13 +432,9 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
-  const googleUser = getSessionFromRequest(req);
-  if (!googleUser) {
-    return jsonError(
-      401,
-      'UNAUTHORIZED',
-      '학교 구글 계정으로 로그인해 주세요.'
-    );
+  const session = getSessionFromRequest(req);
+  if (!session) {
+    return jsonError(401, 'UNAUTHORIZED', '이름과 전화번호로 로그인해 주세요.');
   }
 
   const roundSql = getSql();
@@ -488,7 +476,9 @@ export async function PATCH(req: NextRequest) {
     const existing = await sql`
       SELECT student_id
       FROM student
-      WHERE google_sub = ${googleUser.sub} AND round = ${round}
+      WHERE lower(btrim(name)) = ${nameKey(session.name)}
+        AND regexp_replace(phone, '[^0-9]', '', 'g') = ${phoneDigits(session.phone)}
+        AND round = ${round}
       LIMIT 1
     `;
     const studentId = existing[0] ? String(existing[0].student_id) : '';
@@ -514,18 +504,14 @@ export async function PATCH(req: NextRequest) {
 
     if (has('phone')) {
       const phoneRaw = asTrimmedString(body.phone);
-      const phoneDigits = phoneRaw ? phoneRaw.replace(/\D/g, '') : '';
-      if (!/^01[016789]\d{7,8}$/.test(phoneDigits)) {
+      if (!phoneRaw || !isValidKrPhone(phoneRaw)) {
         return jsonError(
           400,
           'VALIDATION_ERROR',
           '전화번호를 올바르게 입력해 주세요.'
         );
       }
-      const phone =
-        phoneDigits.length === 11
-          ? `${phoneDigits.slice(0, 3)}-${phoneDigits.slice(3, 7)}-${phoneDigits.slice(7)}`
-          : `${phoneDigits.slice(0, 3)}-${phoneDigits.slice(3, 6)}-${phoneDigits.slice(6)}`;
+      const phone = formatKrPhone(phoneRaw);
       queries.push(sql`
         UPDATE student SET phone = ${phone} WHERE student_id = ${studentId}
       `);
@@ -699,11 +685,26 @@ export async function PATCH(req: NextRequest) {
       await sql.transaction(queries);
     }
 
-    const survey = await loadOwnSurvey(sql, googleUser.sub, round);
+    const nextName = has('name')
+      ? parseSubmittedName(body.name) ?? session.name
+      : session.name;
+    const nextPhone = has('phone')
+      ? formatKrPhone(String(body.phone ?? session.phone))
+      : session.phone;
+    const survey = await loadOwnSurvey(
+      sql,
+      { name: nextName, phone: nextPhone },
+      round
+    );
     if (!survey) {
       return jsonError(404, 'NOT_FOUND', '접수 내역이 없습니다.');
     }
-    return NextResponse.json(survey);
+    const res = NextResponse.json(survey);
+    if (has('name') || has('phone')) {
+      const token = encodeSession({ name: survey.name, phone: survey.phone });
+      if (token) res.cookies.set(SESSION_COOKIE, token, sessionCookieOptions());
+    }
+    return res;
   } catch (err) {
     console.error('PATCH /api/surveys', err);
     const message =
@@ -719,13 +720,9 @@ export async function PATCH(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  const googleUser = getSessionFromRequest(req);
-  if (!googleUser) {
-    return jsonError(
-      401,
-      'UNAUTHORIZED',
-      '학교 구글 계정으로 로그인해 주세요.'
-    );
+  const session = getSessionFromRequest(req);
+  if (!session) {
+    return jsonError(401, 'UNAUTHORIZED', '이름과 전화번호로 로그인해 주세요.');
   }
 
   const sql = getSql();
@@ -738,7 +735,9 @@ export async function DELETE(req: NextRequest) {
   try {
     const deleted = await sql`
       DELETE FROM student
-      WHERE google_sub = ${googleUser.sub} AND round = ${round}
+      WHERE lower(btrim(name)) = ${nameKey(session.name)}
+        AND regexp_replace(phone, '[^0-9]', '', 'g') = ${phoneDigits(session.phone)}
+        AND round = ${round}
       RETURNING student_id
     `;
     if (deleted.length === 0) {

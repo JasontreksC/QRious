@@ -53,7 +53,7 @@ export default function AdminStudentsPage() {
     return students.filter(
       (s) =>
         s.name.toLowerCase().includes(q) ||
-        (s.email ?? '').toLowerCase().includes(q) ||
+        s.phone.replace(/\D/g, '').includes(q.replace(/\D/g, '')) ||
         (s.major ?? '').toLowerCase().includes(q)
     );
   }, [students, query]);
@@ -87,7 +87,7 @@ export default function AdminStudentsPage() {
   const handleDelete = async (student: AdminStudent) => {
     if (
       !window.confirm(
-        `${student.name}${student.email ? ` (${student.email})` : ''} 참가자를 삭제할까요?`
+        `${student.name} 참가자를 삭제할까요?`
       )
     ) {
       return;
@@ -140,7 +140,7 @@ export default function AdminStudentsPage() {
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="이름, 이메일 또는 학과 검색"
+            placeholder="이름, 전화번호 또는 학과 검색"
             className="w-44 sm:w-56 px-3 py-2 rounded-lg border border-[#F0D9DF] bg-[#FDE8EC] text-sm outline-none placeholder-[#C9B0BE] focus:border-[#E8526A] focus:bg-white"
           />
           <button
@@ -183,7 +183,6 @@ export default function AdminStudentsPage() {
               <tr className="text-xs uppercase tracking-wider text-[#8C7A8E] border-b border-[#F0D9DF]">
                 <th className="py-2 px-5 font-semibold">이름</th>
                 <th className="py-2 pr-3 font-semibold">차수</th>
-                <th className="py-2 pr-3 font-semibold">이메일</th>
                 <th className="py-2 pr-3 font-semibold">학과</th>
                 <th className="py-2 pr-3 font-semibold">전화번호</th>
                 <th className="py-2 pr-3 font-semibold">성별</th>
@@ -200,9 +199,6 @@ export default function AdminStudentsPage() {
                     <tr className="border-b border-[#F0D9DF]/80">
                       <td className="py-3 px-5">{student.name}</td>
                       <td className="py-3 pr-3">{student.round}차</td>
-                      <td className="py-3 pr-3 font-mono text-[13px]">
-                        {student.email || '-'}
-                      </td>
                       <td className="py-3 pr-3">{student.major || '-'}</td>
                       <td className="py-3 pr-3 font-mono text-[13px]">
                         {student.phone || '-'}
@@ -269,10 +265,10 @@ export default function AdminStudentsPage() {
                             </p>
                             <p className="text-xs leading-relaxed sm:col-span-2">
                               <span className="font-semibold text-[#8C7A8E]">
-                                구글 계정
+                                전화번호
                               </span>
                               <br />
-                              {student.email || '없음'}
+                              {student.phone || '없음'}
                             </p>
                             <p className="text-xs leading-relaxed sm:col-span-2">
                               <span className="font-semibold text-[#8C7A8E]">

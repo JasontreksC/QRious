@@ -188,7 +188,6 @@ export type AdminStudent = {
   want: string[];
   ex_have: string | null;
   ex_want: string | null;
-  email: string | null;
   consent_agreed: boolean | null;
   consented_at: string | null;
   consent_version: string | null;
@@ -197,13 +196,12 @@ export type AdminStudent = {
   third_party_consent_version: string | null;
 };
 
-export type GoogleAuthSession =
+export type AuthSession =
   | { authenticated: false }
   | {
       authenticated: true;
-      email: string;
       name: string;
-      picture: string | null;
+      phone: string;
       submitted: boolean;
       rounds: number[];
       round1SubmittedAt: string | null;
@@ -212,11 +210,21 @@ export type GoogleAuthSession =
       isAdmin: boolean;
     };
 
-export async function getGoogleSession(): Promise<GoogleAuthSession> {
-  return request<GoogleAuthSession>('/api/auth/session', { cache: 'no-store' });
+export async function getAuthSession(): Promise<AuthSession> {
+  return request<AuthSession>('/api/auth/session', { cache: 'no-store' });
 }
 
-export async function logoutGoogle(): Promise<void> {
+export async function loginWithNamePhone(
+  name: string,
+  phone: string
+): Promise<void> {
+  await request<{ ok: boolean }>('/api/auth/login', {
+    method: 'POST',
+    body: JSON.stringify({ name, phone }),
+  });
+}
+
+export async function logoutSession(): Promise<void> {
   await request<{ ok: boolean }>('/api/auth/logout', { method: 'POST' });
 }
 

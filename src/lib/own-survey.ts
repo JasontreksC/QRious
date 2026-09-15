@@ -3,6 +3,7 @@ import {
   currentRegistrationRound,
   type RegistrationRound,
 } from '@/lib/deadline';
+import { nameKey, phoneDigits } from '@/lib/phone';
 
 export type OwnSurvey = {
   student_id: string;
@@ -24,14 +25,32 @@ export type OwnSurvey = {
   ex_want: string | null;
 };
 
+export type StudentIdentity = {
+  name: string;
+  phone: string;
+};
+
+function identityKeys(identity: StudentIdentity): {
+  name: string;
+  phone: string;
+} | null {
+  const name = nameKey(identity.name);
+  const phone = phoneDigits(identity.phone);
+  if (!name || !phone) return null;
+  return { name, phone };
+}
+
 export async function listStudentRounds(
   sql: Sql,
-  googleSub: string
+  identity: StudentIdentity
 ): Promise<RegistrationRound[]> {
+  const keys = identityKeys(identity);
+  if (!keys) return [];
   const rows = await sql`
     SELECT round
     FROM student
-    WHERE google_sub = ${googleSub}
+    WHERE lower(btrim(name)) = ${keys.name}
+      AND regexp_replace(phone, '[^0-9]', '', 'g') = ${keys.phone}
     ORDER BY round ASC
   `;
   return rows
@@ -41,16 +60,19 @@ export async function listStudentRounds(
 
 export async function loadRoundSubmittedAts(
   sql: Sql,
-  googleSub: string
+  identity: StudentIdentity
 ): Promise<{ 1: string | null; 2: string | null }> {
+  const keys = identityKeys(identity);
+  const result: { 1: string | null; 2: string | null } = { 1: null, 2: null };
+  if (!keys) return result;
   const rows = await sql`
     SELECT s.round, MIN(c.consented_at) AS submitted_at
     FROM student s
     JOIN consent c ON c.student_id = s.student_id
-    WHERE s.google_sub = ${googleSub}
+    WHERE lower(btrim(s.name)) = ${keys.name}
+      AND regexp_replace(s.phone, '[^0-9]', '', 'g') = ${keys.phone}
     GROUP BY s.round
   `;
-  const result: { 1: string | null; 2: string | null } = { 1: null, 2: null };
   for (const row of rows) {
     const round = Number(row.round);
     if (round !== 1 && round !== 2) continue;
@@ -63,17 +85,19 @@ export async function loadRoundSubmittedAts(
   return result;
 }
 
-export async function studentHasRoundByEmail(
-  email: string,
+export async function studentHasRoundByIdentity(
+  identity: StudentIdentity,
   round: RegistrationRound,
   sql: Sql
 ): Promise<boolean> {
-  const normalized = email.trim().toLowerCase();
-  if (!normalized) return false;
+  const keys = identityKeys(identity);
+  if (!keys) return false;
   const rows = await sql`
     SELECT 1
     FROM student
-    WHERE lower(email) = ${normalized} AND round = ${round}
+    WHERE lower(btrim(name)) = ${keys.name}
+      AND regexp_replace(phone, '[^0-9]', '', 'g') = ${keys.phone}
+      AND round = ${round}
     LIMIT 1
   `;
   return rows.length > 0;
@@ -81,9 +105,12 @@ export async function studentHasRoundByEmail(
 
 export async function loadOwnSurvey(
   sql: Sql,
-  googleSub: string,
+  identity: StudentIdentity,
   round: RegistrationRound | null = currentRegistrationRound()
 ): Promise<OwnSurvey | null> {
+  const keys = identityKeys(identity);
+  if (!keys) return null;
+
   const students = round
     ? await sql`
         SELECT
@@ -98,7 +125,9 @@ export async function loadOwnSurvey(
           m.name AS major
         FROM student s
         JOIN major m ON m.major_id = s.major_id
-        WHERE s.google_sub = ${googleSub} AND s.round = ${round}
+        WHERE lower(btrim(s.name)) = ${keys.name}
+          AND regexp_replace(s.phone, '[^0-9]', '', 'g') = ${keys.phone}
+          AND s.round = ${round}
         LIMIT 1
       `
     : await sql`
@@ -114,7 +143,8 @@ export async function loadOwnSurvey(
           m.name AS major
         FROM student s
         JOIN major m ON m.major_id = s.major_id
-        WHERE s.google_sub = ${googleSub}
+        WHERE lower(btrim(s.name)) = ${keys.name}
+          AND regexp_replace(s.phone, '[^0-9]', '', 'g') = ${keys.phone}
         ORDER BY s.round DESC
         LIMIT 1
       `;

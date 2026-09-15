@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { getGoogleSession, type GoogleAuthSession } from '@/lib/api';
+import { getAuthSession, type AuthSession } from '@/lib/api';
 
 const TABS = [
   { href: '/admin/students', label: '참가자 목록' },
@@ -15,13 +15,13 @@ const TABS = [
 export function AdminShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [checking, setChecking] = useState(true);
-  const [session, setSession] = useState<GoogleAuthSession | null>(null);
+  const [session, setSession] = useState<AuthSession | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const next = await getGoogleSession();
+        const next = await getAuthSession();
         if (!cancelled) setSession(next);
       } catch {
         if (!cancelled) setSession({ authenticated: false });
@@ -64,16 +64,16 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
           <div className="bg-white border border-[#F0D9DF] rounded-2xl p-6 shadow-sm max-w-md text-center">
             <p className="text-sm text-[#8C7A8E] leading-relaxed">
               {session?.authenticated
-                ? '이 구글 계정은 관리자 권한이 없어요.'
-                : '허용된 학교 구글 계정으로 로그인한 뒤 관리자 페이지를 이용할 수 있어요.'}
+                ? '이 계정은 관리자 권한이 없어요.'
+                : '홈에서 이름과 전화번호로 로그인한 뒤, 관리자 전화번호로 등록된 계정만 이 페이지를 볼 수 있어요.'}
             </p>
             {!session?.authenticated && (
-              <a
-                href="/api/auth/google"
+              <Link
+                href="/"
                 className="mt-5 w-full inline-flex items-center justify-center min-h-[48px] px-5 py-3 rounded-xl bg-gradient-to-r from-[#E8526A] to-[#F28C6E] text-white font-bold"
               >
-                구글 계정으로 로그인
-              </a>
+                홈에서 로그인
+              </Link>
             )}
           </div>
         ) : (

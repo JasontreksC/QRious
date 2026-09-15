@@ -112,14 +112,17 @@ export function isAwaitingAnnouncement(
   );
 }
 
-/** 접수 중이거나, 발표가 난 뒤에만 구글 로그인을 보여 줍니다. */
-export function shouldShowGoogleLogin(
+/** 접수 중이거나, 발표가 난 뒤에만 로그인을 보여 줍니다. */
+export function shouldShowLogin(
   now = Date.now(),
   times: EventTimes = DEFAULT_EVENT_TIMES
 ): boolean {
   if (isAwaitingAnnouncement(now, times)) return false;
   return isSurveyOpen(now, times) || now >= eventTimeMs('round1Announce', times);
 }
+
+/** @deprecated Use shouldShowLogin */
+export const shouldShowGoogleLogin = shouldShowLogin;
 
 export function isRound2Open(
   now = Date.now(),

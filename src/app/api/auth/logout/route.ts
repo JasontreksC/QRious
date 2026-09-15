@@ -1,10 +1,16 @@
 import { NextResponse } from 'next/server';
-import { GOOGLE_COOKIE, cookieBaseOptions } from '@/lib/google-auth';
+import {
+  LEGACY_GOOGLE_COOKIE,
+  SESSION_COOKIE,
+  cookieBaseOptions,
+} from '@/lib/session';
 
 export const runtime = 'nodejs';
 
 export async function POST() {
   const res = NextResponse.json({ ok: true });
-  res.cookies.set(GOOGLE_COOKIE, '', { ...cookieBaseOptions(), maxAge: 0 });
+  const expired = { ...cookieBaseOptions(), maxAge: 0 };
+  res.cookies.set(SESSION_COOKIE, '', expired);
+  res.cookies.set(LEGACY_GOOGLE_COOKIE, '', expired);
   return res;
 }

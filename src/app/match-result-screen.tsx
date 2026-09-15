@@ -2,9 +2,9 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { logoutGoogle, type MatchPartner } from '@/lib/api';
+import { logoutSession, type MatchPartner } from '@/lib/api';
 import type { Round2CtaState } from '@/lib/deadline';
-import { parseStudentDisplayName } from '@/lib/student-name';
+import { FestivalBenefitsCoupons } from './festival-benefits-coupons';
 import { PixelHeart, QriousWordmark } from './qrious-wordmark';
 import { SiteHeader } from './site-header';
 import styles from './y2k-theme.module.css';
@@ -16,8 +16,7 @@ type MatchResultScreenProps = {
   round2OpenLabel: string;
   account: {
     name: string;
-    email: string;
-    picture: string | null;
+    phone: string;
   };
 };
 
@@ -33,7 +32,7 @@ export function MatchResultScreen({
   const handleLogout = async () => {
     setLoggingOut(true);
     try {
-      await logoutGoogle();
+      await logoutSession();
     } finally {
       window.location.href = '/';
     }
@@ -84,27 +83,14 @@ export function MatchResultScreen({
           </div>
           <div className={styles.resultCard}>
           <div className="mb-5 flex items-center gap-3 rounded-xl bg-[#FDE8EC] border border-[#F0D9DF] px-3 py-2.5 text-left">
-            {account.picture ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={account.picture}
-                alt=""
-                width={36}
-                height={36}
-                className="h-9 w-9 rounded-full object-cover bg-white"
-                referrerPolicy="no-referrer"
-              />
-            ) : (
-              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-sm font-bold text-[#E8526A]">
-                {parseStudentDisplayName(account.name)?.slice(0, 1) ||
-                  account.name.slice(0, 1)}
-              </span>
-            )}
+            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-sm font-bold text-[#E8526A]">
+              {account.name.slice(0, 1)}
+            </span>
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-semibold text-[#2B1B2E]">
                 {account.name}
               </p>
-              <p className="truncate text-xs text-[#8C7A8E]">{account.email}</p>
+              <p className="truncate text-xs text-[#8C7A8E]">{account.phone}</p>
             </div>
           </div>
           <p className={styles.resultEyebrow}>YOU&apos;VE GOT LOVE</p>
@@ -137,7 +123,7 @@ export function MatchResultScreen({
             </div>
           ) : null}
           <p className={styles.resultNote}>
-            매칭된 상대방과 컴소과 주점에 오시면 특별한 서비스를 드려요!
+            아래 쿠폰을 확인하고 컴소과 부스에 함께 와 주세요!
           </p>
         </div>
         </div>
@@ -159,6 +145,7 @@ export function MatchResultScreen({
             )}
           </div>
         ) : null}
+        <FestivalBenefitsCoupons matched />
       </div>
     </div>
   );

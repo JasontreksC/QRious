@@ -5,15 +5,16 @@ import Image from 'next/image';
 import Link from 'next/link';
 import {
   cancelSurvey,
+  getAuthSession,
   getCharms,
-  getGoogleSession,
   getMajors,
   getStats,
-  logoutGoogle,
+  loginWithNamePhone,
+  logoutSession,
   submitSurvey,
   ApiError,
+  type AuthSession,
   type Charm,
-  type GoogleAuthSession,
   type Major,
   type SurveyStats,
 } from '@/lib/api';
@@ -42,7 +43,6 @@ import {
   type AgePrefSpecificId,
 } from '@/lib/age-pref';
 import {
-  parseStudentDisplayName,
   STUDENT_NAME_MAX,
   STUDENT_NAME_MIN,
 } from '@/lib/student-name';
@@ -51,8 +51,9 @@ import { DeadlineCountdown, Round1ResultAndRound2OpenNotice, SurveyClosedPage, U
 import { QriousWordmark } from './qrious-wordmark';
 import { SiteHeader } from './site-header';
 import { SubmittedSurvey } from './submitted-survey';
+import { FestivalBenefitsCoupons } from './festival-benefits-coupons';
 import { useEventTimes } from './event-times-context';
-import { formatKstMonthDayTime, getHeroTitlePlaques, getParticipantHomeView, isAwaitingAnnouncement, isRound1ResultAndRound2Open, isSurveyOpen, shouldShowGoogleLogin, roundLabel } from '@/lib/deadline';
+import { formatKstMonthDayTime, getHeroTitlePlaques, getParticipantHomeView, isAwaitingAnnouncement, isRound1ResultAndRound2Open, isSurveyOpen, shouldShowLogin, roundLabel } from '@/lib/deadline';
 import qriousLogo from './icon.png';
 import styles from './y2k-theme.module.css';
 
@@ -92,19 +93,96 @@ function isValidKrPhone(value: string): boolean {
   return /^01[016789]\d{7,8}$/.test(d);
 }
 
-const OAUTH_ERROR_STORAGE_KEY = 'qrious_oauth_error';
+function NamePhoneLogin({
+  onLoggedIn,
+}: {
+  onLoggedIn: () => Promise<void>;
+}) {
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
 
-function oauthErrorMessage(code: string | null): string | null {
-  if (code === 'domain') {
-    return '학교 계정(yeonsung.ac.kr)을 사용해 주세요.';
-  }
-  if (code === 'google') {
-    return '구글 로그인에 실패했습니다. 다시 시도해 주세요.';
-  }
-  if (code === 'config') {
-    return '구글 로그인이 아직 설정되지 않았습니다.';
-  }
-  return null;
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmedName = name.trim();
+    if (trimmedName.length < STUDENT_NAME_MIN) {
+      setError('이름은 2글자 이상이어야 합니다.');
+      return;
+    }
+    if (trimmedName.length > STUDENT_NAME_MAX) {
+      setError('이름은 20글자 이하여야 합니다.');
+      return;
+    }
+    if (!isValidKrPhone(phone)) {
+      setError('휴대폰 번호 형식(010-1234-5678)으로 입력해 주세요.');
+      return;
+    }
+    setSubmitting(true);
+    setError('');
+    try {
+      await loginWithNamePhone(trimmedName, phone);
+      await onLoggedIn();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '로그인에 실패했습니다.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <form onSubmit={(e) => void handleSubmit(e)} className="space-y-3">
+      <div className="flex flex-col gap-1 text-left">
+        <label
+          htmlFor="login-name"
+          className="text-xs font-semibold text-[#8C7A8E] tracking-wider uppercase"
+        >
+          이름
+        </label>
+        <input
+          id="login-name"
+          type="text"
+          autoComplete="name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="예) 홍길동"
+          className="w-full px-4 py-3 border-1.5 border-[#F0D9DF] rounded-xl font-sans text-[16px] text-[#2B1B2E] bg-[#FDE8EC] outline-none placeholder-[#C9B0BE] focus:border-[#E8526A] focus:bg-white"
+        />
+      </div>
+      <div className="flex flex-col gap-1 text-left">
+        <label
+          htmlFor="login-phone"
+          className="text-xs font-semibold text-[#8C7A8E] tracking-wider uppercase"
+        >
+          전화번호
+        </label>
+        <input
+          id="login-phone"
+          type="tel"
+          inputMode="numeric"
+          autoComplete="tel"
+          value={phone}
+          onChange={(e) => setPhone(formatKrPhone(e.target.value))}
+          placeholder="예) 010-1234-5678"
+          className="w-full px-4 py-3 border-1.5 border-[#F0D9DF] rounded-xl font-sans text-[16px] text-[#2B1B2E] bg-[#FDE8EC] outline-none placeholder-[#C9B0BE] focus:border-[#E8526A] focus:bg-white"
+        />
+      </div>
+      {error ? (
+        <p className="text-[13px] text-[#E8526A] leading-relaxed">{error}</p>
+      ) : (
+        <p className="text-[13px] leading-relaxed text-[#8C7A8E]">
+          접수할 때 쓴 이름과 전화번호로 로그인해요.
+        </p>
+      )}
+      <button
+        type="submit"
+        disabled={submitting}
+        className="w-full inline-flex items-center justify-center min-h-[52px] px-5 py-3.5 bg-white border border-[#F0D9DF] hover:bg-[#FDE8EC] text-[#2B1B2E] text-[16px] font-semibold rounded-xl transition-colors duration-200 disabled:opacity-50"
+      >
+        {submitting ? '로그인 중…' : '로그인'}
+      </button>
+    </form>
+  );
 }
 
 type AgePrefForm = {
@@ -153,45 +231,6 @@ const initialFormData: FormData = {
   exWant: '',
   consent: false,
 };
-
-function GoogleLoginButton() {
-  return (
-    <div className="space-y-3">
-      <a
-        href="/api/auth/google"
-        className="w-full inline-flex items-center justify-center gap-2 min-h-[52px] px-5 py-3.5 bg-white border border-[#F0D9DF] hover:bg-[#FDE8EC] text-[#2B1B2E] text-[16px] font-semibold rounded-xl transition-colors duration-200"
-      >
-        <svg
-          className="w-5 h-5"
-          viewBox="0 0 24 24"
-          xmlns="http://www.w3.org/2000/svg"
-          aria-hidden="true"
-        >
-          <path
-            fill="#4285F4"
-            d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-          />
-          <path
-            fill="#34A853"
-            d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-          />
-          <path
-            fill="#FBBC05"
-            d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-          />
-          <path
-            fill="#EA4335"
-            d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-          />
-        </svg>
-        학교 구글 계정으로 로그인
-      </a>
-      <p className="text-center text-[13px] leading-relaxed text-[#8C7A8E]">
-        학교 구글 메일 주소(@yeonsung.ac.kr)를 입력해 주세요.
-      </p>
-    </div>
-  );
-}
 
 function HeroTitlePlaque({ label }: { label: string }) {
   return (
@@ -263,7 +302,7 @@ export default function Home({
   const [submitted, setSubmitted] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [showToast, setShowToast] = useState(false);
-  const [googleSession, setGoogleSession] = useState<GoogleAuthSession | null>(
+  const [authSession, setAuthSession] = useState<AuthSession | null>(
     null
   );
   const [authLoading, setAuthLoading] = useState(
@@ -276,16 +315,16 @@ export default function Home({
   const registrationRound = useRegistrationRound();
   const now = useNow();
   const awaitingAnnouncement = isAwaitingAnnouncement(now, times);
-  const showGoogleLogin = shouldShowGoogleLogin(now, times);
+  const showLogin = shouldShowLogin(now, times);
   const round1ResultAndRound2Open = isRound1ResultAndRound2Open(now, times);
   const heroPlaques = getHeroTitlePlaques(now, times);
   const previousRound1 =
-    googleSession?.authenticated === true &&
-    googleSession.rounds.includes(1);
+    authSession?.authenticated === true &&
+    authSession.rounds.includes(1);
   const homeView =
-    googleSession?.authenticated === true
+    authSession?.authenticated === true
       ? getParticipantHomeView({
-          rounds: googleSession.rounds,
+          rounds: authSession.rounds,
           applyRound2,
           now,
           times,
@@ -293,9 +332,9 @@ export default function Home({
       : null;
   const displayRound =
     registrationRound ??
-    (googleSession?.authenticated && googleSession.rounds.includes(2)
+    (authSession?.authenticated && authSession.rounds.includes(2)
       ? 2
-      : googleSession?.authenticated && googleSession.rounds.includes(1)
+      : authSession?.authenticated && authSession.rounds.includes(1)
         ? 1
         : null);
 
@@ -360,32 +399,12 @@ export default function Home({
     fetchStats();
     fetchCharms();
     fetchMajors();
-
-    const params = new URLSearchParams(window.location.search);
-    const fromUrl = params.get('error');
-    if (fromUrl) {
-      sessionStorage.setItem(OAUTH_ERROR_STORAGE_KEY, fromUrl);
-      window.history.replaceState({}, '', window.location.pathname);
-    }
-    const errorCode = sessionStorage.getItem(OAUTH_ERROR_STORAGE_KEY);
-    if (errorCode === 'not_student') {
-      window.alert('학생만 참가할 수 있습니다.');
-    } else {
-      const oauthError = oauthErrorMessage(errorCode);
-      if (oauthError) {
-        triggerToast(`⚠️ ${oauthError}`);
-      }
-    }
-    const clearError = window.setTimeout(() => {
-      sessionStorage.removeItem(OAUTH_ERROR_STORAGE_KEY);
-    }, 500);
-    return () => window.clearTimeout(clearError);
   }, []);
 
   useEffect(() => {
     if (awaitingAnnouncement) {
       setAuthLoading(false);
-      setGoogleSession(null);
+      setAuthSession(null);
       setSubmitted(false);
       return;
     }
@@ -394,18 +413,10 @@ export default function Home({
     setAuthLoading(true);
     (async () => {
       try {
-        const session = await getGoogleSession();
+        const session = await getAuthSession();
         if (cancelled) return;
         if (session.authenticated) {
-          const displayName = parseStudentDisplayName(session.name);
-          if (!displayName) {
-            window.alert('학생만 참가할 수 있습니다.');
-            await logoutGoogle();
-            if (cancelled) return;
-            setGoogleSession({ authenticated: false });
-            return;
-          }
-          setGoogleSession(session);
+          setAuthSession(session);
           if (session.matched && !applyRound2) {
             window.location.replace('/result');
             return;
@@ -413,14 +424,15 @@ export default function Home({
           if (session.submitted) setSubmitted(true);
           setFormData((prev) => ({
             ...prev,
-            name: prev.name || displayName,
+            name: prev.name || session.name,
+            phone: prev.phone || session.phone,
           }));
         } else {
-          setGoogleSession(session);
+          setAuthSession(session);
         }
       } catch (err) {
-        console.error('Error fetching Google session:', err);
-        if (!cancelled) setGoogleSession({ authenticated: false });
+        console.error('Error fetching session:', err);
+        if (!cancelled) setAuthSession({ authenticated: false });
       } finally {
         if (!cancelled) setAuthLoading(false);
       }
@@ -674,7 +686,7 @@ export default function Home({
 
       setSubmitted(true);
       if (registrationRound != null) {
-        setGoogleSession((prev) => {
+        setAuthSession((prev) => {
           if (!prev?.authenticated) return prev;
           return {
             ...prev,
@@ -691,14 +703,9 @@ export default function Home({
           '⚠️ 이미 이번 차수에 접수했습니다.'
         );
         setSubmitted(true);
-      } else if (err instanceof ApiError && err.status === 403) {
-        window.alert('학생만 참가할 수 있습니다.');
-        await logoutGoogle();
-        setGoogleSession({ authenticated: false });
-        setSubmitted(false);
       } else if (err instanceof ApiError && err.status === 401) {
-        setGoogleSession({ authenticated: false });
-        triggerToast('⚠️ 학교 구글 계정으로 로그인해 주세요.');
+        setAuthSession({ authenticated: false });
+        triggerToast('⚠️ 이름과 전화번호로 로그인해 주세요.');
       } else {
         const message =
           err instanceof Error ? err.message : '서버 응답 오류';
@@ -712,8 +719,8 @@ export default function Home({
   const handleLogout = async () => {
     setLoggingOut(true);
     try {
-      await logoutGoogle();
-      setGoogleSession({ authenticated: false });
+      await logoutSession();
+      setAuthSession({ authenticated: false });
       setSubmitted(false);
     } catch (err) {
       console.error('Logout error:', err);
@@ -734,7 +741,7 @@ export default function Home({
       await cancelSurvey();
       setSubmitted(false);
       if (registrationRound != null) {
-        setGoogleSession((prev) => {
+        setAuthSession((prev) => {
           if (!prev?.authenticated) return prev;
           return {
             ...prev,
@@ -799,15 +806,15 @@ export default function Home({
       </div>
       <SiteHeader
         onLogout={
-          !awaitingAnnouncement && googleSession?.authenticated
+          !awaitingAnnouncement && authSession?.authenticated
             ? handleLogout
             : undefined
         }
         loggingOut={loggingOut}
       />
       {!awaitingAnnouncement &&
-        googleSession?.authenticated &&
-        googleSession.isAdmin && (
+        authSession?.authenticated &&
+        authSession.isAdmin && (
         <Link
           href="/admin"
           className={`${styles.sessionChipRight} px-3 py-2 rounded-xl text-xs font-bold tracking-wide bg-white/90 border border-[#F0D9DF] text-[#8C7A8E] shadow-sm hover:bg-[#FDE8EC] hover:text-[#E8526A]`}
@@ -880,12 +887,12 @@ export default function Home({
         <DeadlineCountdown />
 
         {(homeView === 'form' ||
-          (!googleSession?.authenticated &&
+          (!authSession?.authenticated &&
             surveyOpen &&
             !round1ResultAndRound2Open)) && (
           <div className="text-center mb-8">
             <p className="text-sm text-[#8C7A8E] mt-1.5 leading-relaxed">
-              {googleSession?.authenticated ? (
+              {authSession?.authenticated ? (
                 <>
                   {registrationRound === 2 && previousRound1 ? (
                     <>
@@ -899,9 +906,9 @@ export default function Home({
                 </>
               ) : (
                 <>
-                  연성대학교 구글 계정(@yeonsung.ac.kr)으로
+                  이름과 전화번호로 로그인한 뒤
                   <br />
-                  로그인한 뒤 {registrationRound ? `${registrationRound}차 ` : ''}접수를 진행해 주세요.
+                  {registrationRound ? `${registrationRound}차 ` : ''}접수를 진행해 주세요.
                 </>
               )}
             </p>
@@ -914,14 +921,33 @@ export default function Home({
           <div className="bg-white border border-[#F0D9DF] rounded-2xl p-6 shadow-sm h-[180px] animate-pulse flex flex-col items-center justify-center text-xs text-[#8C7A8E] gap-2">
             <span>로그인 상태를 확인하는 중…</span>
           </div>
-        ) : !googleSession?.authenticated ? (
+        ) : !authSession?.authenticated ? (
           <div className="space-y-4">
             {round1ResultAndRound2Open ? (
               <Round1ResultAndRound2OpenNotice />
             ) : !surveyOpen ? (
               <SurveyClosedPage />
             ) : null}
-            {showGoogleLogin ? <GoogleLoginButton /> : null}
+            {showLogin ? (
+              <NamePhoneLogin
+                onLoggedIn={async () => {
+                  const session = await getAuthSession();
+                  setAuthSession(session);
+                  if (session.authenticated) {
+                    if (session.matched && !applyRound2) {
+                      window.location.replace('/result');
+                      return;
+                    }
+                    if (session.submitted) setSubmitted(true);
+                    setFormData((prev) => ({
+                      ...prev,
+                      name: prev.name || session.name,
+                      phone: prev.phone || session.phone,
+                    }));
+                  }
+                }}
+              />
+            ) : null}
           </div>
         ) : homeView === 'never' ? (
           <SurveyClosedPage hasSurvey={false} />
@@ -930,43 +956,30 @@ export default function Home({
         ) : homeView === 'unmatched' ||
           homeView === 'unmatched-with-round2' ? (
           <UnmatchedPage
-            unmatchedRound={googleSession.rounds.includes(2) ? 2 : 1}
+            unmatchedRound={authSession.rounds.includes(2) ? 2 : 1}
             showRound2Cta={homeView === 'unmatched-with-round2'}
             submittedAt={
-              googleSession.authenticated
-                ? googleSession.rounds.includes(2)
-                  ? googleSession.round2SubmittedAt
-                  : googleSession.round1SubmittedAt
+              authSession.authenticated
+                ? authSession.rounds.includes(2)
+                  ? authSession.round2SubmittedAt
+                  : authSession.round1SubmittedAt
                 : null
             }
           />
         ) : homeView === 'submitted' ? (
           <div>
             <div className="text-center py-10 bg-white border border-[#F0D9DF] rounded-2xl p-6 shadow-sm">
-              {googleSession.authenticated && (
+              {authSession.authenticated && (
                 <div className="mb-6 flex items-center gap-3 rounded-xl bg-[#FDE8EC] border border-[#F0D9DF] px-3 py-2.5 text-left">
-                  {googleSession.picture ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={googleSession.picture}
-                      alt=""
-                      width={36}
-                      height={36}
-                      className="h-9 w-9 rounded-full object-cover bg-white"
-                      referrerPolicy="no-referrer"
-                    />
-                  ) : (
-                    <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-sm font-bold text-[#E8526A]">
-                      {parseStudentDisplayName(googleSession.name)?.slice(0, 1) ||
-                        googleSession.name.slice(0, 1)}
-                    </span>
-                  )}
+                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-sm font-bold text-[#E8526A]">
+                    {authSession.name.slice(0, 1)}
+                  </span>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-semibold text-[#2B1B2E]">
-                      {googleSession.name}
+                      {authSession.name}
                     </p>
                     <p className="truncate text-xs text-[#8C7A8E]">
-                      {googleSession.email}
+                      {authSession.phone}
                     </p>
                   </div>
                 </div>
@@ -988,10 +1001,6 @@ export default function Home({
                   매칭 결과 발표 일시에 문자로 알림을 발송드릴 예정이에요.
                   <br />
                   문자로 받은 링크를 열거나, 이 사이트에 다시 로그인하면 결과 화면이 나와요. 거기서 매칭된 상대를 알 수 있어요.
-                  <br /><br />
-                  매칭된 커플끼리 컴소과 주점으로 오시면 서비스 드려요!
-                  <br />
-                  매칭 결과 화면을 두분이서 보여주시면 됩니다.
                   <br /><br />
                   경우에 따라 매칭이 안될수도 있어요..ㅜㅜ
                   <br />
@@ -1017,33 +1026,21 @@ export default function Home({
                 {cancelling ? '취소 중…' : '접수 취소'}
               </button>
             ) : null}
+            <FestivalBenefitsCoupons />
           </div>
         ) : (
           <div className="bg-white border border-[#F0D9DF] rounded-2xl p-6 shadow-sm">
-            {googleSession.authenticated && (
+            {authSession.authenticated && (
               <div className="mb-5 flex items-center gap-3 rounded-xl bg-[#FDE8EC] border border-[#F0D9DF] px-3 py-2.5">
-                {googleSession.picture ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={googleSession.picture}
-                    alt=""
-                    width={36}
-                    height={36}
-                    className="h-9 w-9 rounded-full object-cover bg-white"
-                    referrerPolicy="no-referrer"
-                  />
-                ) : (
-                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-sm font-bold text-[#E8526A]">
-                    {parseStudentDisplayName(googleSession.name)?.slice(0, 1) ||
-                      googleSession.name.slice(0, 1)}
-                  </span>
-                )}
+                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-sm font-bold text-[#E8526A]">
+                  {authSession.name.slice(0, 1)}
+                </span>
                 <div className="min-w-0 flex-1 text-left">
                   <p className="truncate text-sm font-semibold text-[#2B1B2E]">
-                    {googleSession.name}
+                    {authSession.name}
                   </p>
                   <p className="truncate text-xs text-[#8C7A8E]">
-                    {googleSession.email}
+                    {authSession.phone}
                   </p>
                 </div>
               </div>
@@ -1778,7 +1775,7 @@ export default function Home({
       </div>
 
       {/* Floating Submit Bar */}
-      {homeView === 'form' && googleSession?.authenticated && surveyOpen && (
+      {homeView === 'form' && authSession?.authenticated && surveyOpen && (
         <div className="fixed bottom-0 left-0 right-0 bg-[#FBF6F0]/92 backdrop-blur-md border-t border-[#F0D9DF] px-4 py-3 z-50 pb-[calc(12px+env(safe-area-inset-bottom))]">
           <button
             type="button"

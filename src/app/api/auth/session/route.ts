@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { emailIsAdmin } from '@/lib/admin-auth';
+import { phoneIsAdmin } from '@/lib/admin-auth';
 import { currentRegistrationRound } from '@/lib/deadline';
 import { loadEventTimes } from '@/lib/event-schedule';
 import { getSql } from '@/lib/db';
-import { getSessionFromRequest } from '@/lib/google-auth';
-import { studentHasMatchByEmail } from '@/lib/match-result';
+import { studentHasMatchByIdentity } from '@/lib/match-result';
 import { listStudentRounds, loadRoundSubmittedAts } from '@/lib/own-survey';
+import { formatKrPhone } from '@/lib/phone';
+import { getSessionFromRequest } from '@/lib/session';
 
 export const runtime = 'nodejs';
 
@@ -23,28 +24,27 @@ export async function GET(req: NextRequest) {
   try {
     const sql = getSql();
     const times = await loadEventTimes(sql);
-    rounds = await listStudentRounds(sql, session.sub);
-    const submittedAts = await loadRoundSubmittedAts(sql, session.sub);
+    rounds = await listStudentRounds(sql, session);
+    const submittedAts = await loadRoundSubmittedAts(sql, session);
     round1SubmittedAt = submittedAts[1];
     round2SubmittedAt = submittedAts[2];
     const currentRound = currentRegistrationRound(Date.now(), times);
     submitted =
       currentRound != null ? rounds.includes(currentRound) : rounds.length > 0;
-    matched = await studentHasMatchByEmail(session.email, sql);
+    matched = await studentHasMatchByIdentity(session, sql);
   } catch (err) {
     console.error('GET /api/auth/session', err);
   }
 
   return NextResponse.json({
     authenticated: true,
-    email: session.email,
     name: session.name,
-    picture: session.picture,
+    phone: formatKrPhone(session.phone),
     submitted,
     rounds,
     round1SubmittedAt,
     round2SubmittedAt,
     matched,
-    isAdmin: await emailIsAdmin(session.email),
+    isAdmin: await phoneIsAdmin(session.phone),
   });
 }

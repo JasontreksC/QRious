@@ -13,7 +13,6 @@ export async function fetchJoinedStudents(sql: Sql): Promise<AdminStudent[]> {
         s.gender,
         s.age,
         s.mbti,
-        s.email,
         m.name AS major
       FROM student s
       LEFT JOIN major m ON m.major_id = s.major_id
@@ -115,7 +114,6 @@ export async function fetchJoinedStudents(sql: Sql): Promise<AdminStudent[]> {
       want: wantMap.get(id) ?? [],
       ex_have: exHaveMap.get(id) || null,
       ex_want: exWantMap.get(id) || null,
-      email: row.email ? String(row.email) : null,
       consent_agreed: consentMap.get(id)?.agreed ?? null,
       consented_at: consentMap.get(id)?.consented_at || null,
       consent_version: consentMap.get(id)?.version || null,
@@ -135,7 +133,7 @@ export function filterStudents(
   return students.filter(
     (s) =>
       s.name.toLowerCase().includes(q) ||
-      (s.email ?? '').toLowerCase().includes(q) ||
+      s.phone.replace(/\D/g, '').includes(q.replace(/\D/g, '')) ||
       (s.major ?? '').toLowerCase().includes(q)
   );
 }

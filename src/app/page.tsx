@@ -2,8 +2,8 @@ import { redirect } from 'next/navigation';
 import { EventTimesProvider } from './event-times-context';
 import { currentRegistrationRound, isAwaitingAnnouncement } from '@/lib/deadline';
 import { loadEventTimes } from '@/lib/event-schedule';
-import { getSessionFromCookies } from '@/lib/google-auth';
-import { studentHasMatchByEmail } from '@/lib/match-result';
+import { studentHasMatchByIdentity } from '@/lib/match-result';
+import { getSessionFromCookies } from '@/lib/session';
 import { getSql } from '@/lib/db';
 import Home from './home-client';
 
@@ -29,7 +29,7 @@ export default async function HomePage({
 
   if (session && !applyRound2) {
     const sql = getSql();
-    if (await studentHasMatchByEmail(session.email, sql)) {
+    if (await studentHasMatchByIdentity(session, sql)) {
       redirect('/result');
     }
   }

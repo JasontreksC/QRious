@@ -1,26 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSql } from '@/lib/db';
-import { getSessionFromRequest } from '@/lib/google-auth';
 import { jsonError } from '@/lib/http';
+import { phoneDigits } from '@/lib/phone';
+import { getSessionFromRequest } from '@/lib/session';
 
-export function normalizeAdminEmail(email: string): string {
-  return email.trim().toLowerCase();
+function adminPhonesFromEnv(): string[] {
+  return (process.env.ADMIN_PHONES ?? '')
+    .split(/[,\s]+/)
+    .map((value) => phoneDigits(value))
+    .filter(Boolean);
 }
 
-export async function emailIsAdmin(email: string): Promise<boolean> {
-  const normalized = normalizeAdminEmail(email);
+export async function phoneIsAdmin(phone: string): Promise<boolean> {
+  const normalized = phoneDigits(phone);
   if (!normalized) return false;
+  if (adminPhonesFromEnv().includes(normalized)) return true;
   try {
     const sql = getSql();
     const rows = await sql`
       SELECT 1
       FROM admin
-      WHERE email = ${normalized}
+      WHERE phone IS NOT NULL
+        AND regexp_replace(phone, '[^0-9]', '', 'g') = ${normalized}
       LIMIT 1
     `;
     return rows.length > 0;
   } catch (err) {
-    console.error('emailIsAdmin', err);
+    console.error('phoneIsAdmin', err);
     return false;
   }
 }
@@ -28,7 +34,7 @@ export async function emailIsAdmin(email: string): Promise<boolean> {
 export async function sessionIsAdmin(req: NextRequest): Promise<boolean> {
   const session = getSessionFromRequest(req);
   if (!session) return false;
-  return emailIsAdmin(session.email);
+  return phoneIsAdmin(session.phone);
 }
 
 export function unauthorized() {

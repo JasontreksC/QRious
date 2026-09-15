@@ -1,12 +1,13 @@
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
-import { emailIsAdmin } from '@/lib/admin-auth';
+import { phoneIsAdmin } from '@/lib/admin-auth';
 import { formatKstMonthDayTime, getRound2CtaState, isAwaitingAnnouncement } from '@/lib/deadline';
 import { loadEventTimes } from '@/lib/event-schedule';
-import { getSessionFromCookies } from '@/lib/google-auth';
+import { getSessionFromCookies } from '@/lib/session';
 import { getSql } from '@/lib/db';
-import { loadMatchPartnerByEmail } from '@/lib/match-result';
-import { studentHasRoundByEmail } from '@/lib/own-survey';
+import { loadMatchPartnerByIdentity } from '@/lib/match-result';
+import { studentHasRoundByIdentity } from '@/lib/own-survey';
+import { formatKrPhone } from '@/lib/phone';
 import { MatchResultScreen } from '../match-result-screen';
 
 export const metadata: Metadata = {
@@ -27,13 +28,13 @@ export default async function MatchResultPage() {
     redirect('/');
   }
 
-  const partner = await loadMatchPartnerByEmail(session.email, sql);
+  const partner = await loadMatchPartnerByIdentity(session, sql);
   if (!partner) {
     redirect('/');
   }
 
-  const isAdmin = await emailIsAdmin(session.email);
-  const hasRound2 = await studentHasRoundByEmail(session.email, 2, sql);
+  const isAdmin = await phoneIsAdmin(session.phone);
+  const hasRound2 = await studentHasRoundByIdentity(session, 2, sql);
   const round2Cta = getRound2CtaState(hasRound2, Date.now(), times);
 
   return (
@@ -44,8 +45,7 @@ export default async function MatchResultPage() {
       round2OpenLabel={formatKstMonthDayTime(times.round2Open)}
       account={{
         name: session.name,
-        email: session.email,
-        picture: session.picture,
+        phone: formatKrPhone(session.phone),
       }}
     />
   );
