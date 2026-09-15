@@ -7,11 +7,12 @@ import { nameKey, phoneDigits } from '@/lib/phone';
 
 export type OwnSurvey = {
   student_id: string;
+  registration_id: string;
   round: RegistrationRound;
   name: string;
   phone: string;
   gender: boolean;
-  age: number;
+  birth: string | null;
   mbti: string;
   major_id: string;
   major: string;
@@ -47,11 +48,12 @@ export async function listStudentRounds(
   const keys = identityKeys(identity);
   if (!keys) return [];
   const rows = await sql`
-    SELECT round
-    FROM student
-    WHERE lower(btrim(name)) = ${keys.name}
-      AND regexp_replace(phone, '[^0-9]', '', 'g') = ${keys.phone}
-    ORDER BY round ASC
+    SELECT r.round
+    FROM registration r
+    JOIN student s ON s.student_id = r.student_id
+    WHERE lower(btrim(s.name)) = ${keys.name}
+      AND regexp_replace(s.phone, '[^0-9]', '', 'g') = ${keys.phone}
+    ORDER BY r.round ASC
   `;
   return rows
     .map((row) => Number(row.round))
@@ -66,12 +68,13 @@ export async function loadRoundSubmittedAts(
   const result: { 1: string | null; 2: string | null } = { 1: null, 2: null };
   if (!keys) return result;
   const rows = await sql`
-    SELECT s.round, MIN(c.consented_at) AS submitted_at
-    FROM student s
-    JOIN consent c ON c.student_id = s.student_id
+    SELECT r.round, MIN(c.consented_at) AS submitted_at
+    FROM registration r
+    JOIN student s ON s.student_id = r.student_id
+    JOIN consent c ON c.registration_id = r.registration_id
     WHERE lower(btrim(s.name)) = ${keys.name}
       AND regexp_replace(s.phone, '[^0-9]', '', 'g') = ${keys.phone}
-    GROUP BY s.round
+    GROUP BY r.round
   `;
   for (const row of rows) {
     const round = Number(row.round);
@@ -94,13 +97,27 @@ export async function studentHasRoundByIdentity(
   if (!keys) return false;
   const rows = await sql`
     SELECT 1
-    FROM student
-    WHERE lower(btrim(name)) = ${keys.name}
-      AND regexp_replace(phone, '[^0-9]', '', 'g') = ${keys.phone}
-      AND round = ${round}
+    FROM registration r
+    JOIN student s ON s.student_id = r.student_id
+    WHERE lower(btrim(s.name)) = ${keys.name}
+      AND regexp_replace(s.phone, '[^0-9]', '', 'g') = ${keys.phone}
+      AND r.round = ${round}
     LIMIT 1
   `;
   return rows.length > 0;
+}
+
+export async function deleteOrphanStudent(
+  sql: Sql,
+  studentId: string
+): Promise<void> {
+  await sql`
+    DELETE FROM student s
+    WHERE s.student_id = ${studentId}
+      AND NOT EXISTS (
+        SELECT 1 FROM registration r WHERE r.student_id = s.student_id
+      )
+  `;
 }
 
 export async function loadOwnSurvey(
@@ -111,47 +128,52 @@ export async function loadOwnSurvey(
   const keys = identityKeys(identity);
   if (!keys) return null;
 
-  const students = round
+  const rows = round
     ? await sql`
         SELECT
           s.student_id,
-          s.round,
+          r.registration_id,
+          r.round,
           s.name,
           s.phone,
           s.gender,
-          s.age,
-          s.mbti,
+          s.birth,
+          r.mbti,
           s.major_id,
           m.name AS major
-        FROM student s
+        FROM registration r
+        JOIN student s ON s.student_id = r.student_id
         JOIN major m ON m.major_id = s.major_id
         WHERE lower(btrim(s.name)) = ${keys.name}
           AND regexp_replace(s.phone, '[^0-9]', '', 'g') = ${keys.phone}
-          AND s.round = ${round}
+          AND r.round = ${round}
         LIMIT 1
       `
     : await sql`
         SELECT
           s.student_id,
-          s.round,
+          r.registration_id,
+          r.round,
           s.name,
           s.phone,
           s.gender,
-          s.age,
-          s.mbti,
+          s.birth,
+          r.mbti,
           s.major_id,
           m.name AS major
-        FROM student s
+        FROM registration r
+        JOIN student s ON s.student_id = r.student_id
         JOIN major m ON m.major_id = s.major_id
         WHERE lower(btrim(s.name)) = ${keys.name}
           AND regexp_replace(s.phone, '[^0-9]', '', 'g') = ${keys.phone}
-        ORDER BY s.round DESC
+        ORDER BY r.round DESC
         LIMIT 1
       `;
-  const row = students[0];
+  const row = rows[0];
   if (!row) return null;
 
   const studentId = String(row.student_id);
+  const registrationId = String(row.registration_id);
 
   const [agePrefRows, haveRows, wantRows, exHaveRows, exWantRows] =
     await Promise.all([
@@ -159,33 +181,33 @@ export async function loadOwnSurvey(
         SELECT p.age_pref_id, a.name
         FROM prefer_age p
         JOIN age_pref a ON a.age_pref_id = p.age_pref_id
-        WHERE p.student_id = ${studentId}
+        WHERE p.registration_id = ${registrationId}
         ORDER BY a.sort_order ASC
       `,
       sql`
         SELECT h.charm_id::text AS charm_id, c.name
         FROM have h
         JOIN charm c ON c.charm_id = h.charm_id
-        WHERE h.student_id = ${studentId}
+        WHERE h.registration_id = ${registrationId}
         ORDER BY c.name ASC
       `,
       sql`
         SELECT w.charm_id::text AS charm_id, c.name
         FROM want w
         JOIN charm c ON c.charm_id = w.charm_id
-        WHERE w.student_id = ${studentId}
+        WHERE w.registration_id = ${registrationId}
         ORDER BY c.name ASC
       `,
       sql`
         SELECT charm
         FROM ex_have
-        WHERE student_id = ${studentId}
+        WHERE registration_id = ${registrationId}
         LIMIT 1
       `,
       sql`
         SELECT charm
         FROM ex_want
-        WHERE student_id = ${studentId}
+        WHERE registration_id = ${registrationId}
         LIMIT 1
       `,
     ]);
@@ -193,11 +215,12 @@ export async function loadOwnSurvey(
   const storedRound = Number(row.round);
   return {
     student_id: studentId,
+    registration_id: registrationId,
     round: storedRound === 2 ? 2 : 1,
     name: String(row.name ?? ''),
     phone: String(row.phone ?? ''),
     gender: Boolean(row.gender),
-    age: Number(row.age),
+    birth: row.birth ? String(row.birth) : null,
     mbti: String(row.mbti ?? ''),
     major_id: String(row.major_id),
     major: String(row.major ?? ''),

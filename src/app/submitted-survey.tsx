@@ -11,6 +11,7 @@ import {
   type SurveyPatch,
 } from '@/lib/api';
 import { AGE_PREF_ANY, AGE_PREF_SPECIFIC } from '@/lib/age-pref';
+import { formatBirth } from '@/lib/birth';
 import { STUDENT_NAME_MAX, STUDENT_NAME_MIN } from '@/lib/student-name';
 
 const MBTI_AXES = [
@@ -25,7 +26,6 @@ type FieldKey =
   | 'major'
   | 'phone'
   | 'gender'
-  | 'age'
   | 'agePref'
   | 'mbti'
   | 'have'
@@ -38,7 +38,6 @@ type Draft = {
   major_id: string;
   phone: string;
   gender: boolean;
-  age: string;
   agePrefAny: boolean;
   agePrefIds: string[];
   mbti: string;
@@ -61,7 +60,6 @@ function toDraft(survey: OwnSurvey): Draft {
     major_id: survey.major_id,
     phone: survey.phone,
     gender: survey.gender,
-    age: String(survey.age),
     agePrefAny: survey.age_pref_ids.includes(AGE_PREF_ANY),
     agePrefIds: survey.age_pref_ids.filter((id) => id !== AGE_PREF_ANY),
     mbti: survey.mbti,
@@ -168,13 +166,6 @@ export function SubmittedSurvey({
       payload = { phone: draft.phone };
     } else if (editing === 'gender') {
       payload = { gender: draft.gender };
-    } else if (editing === 'age') {
-      const age = Number(draft.age);
-      if (!Number.isInteger(age)) {
-        setFieldError('나이를 올바르게 입력해 주세요.');
-        return;
-      }
-      payload = { age };
     } else if (editing === 'agePref') {
       const ids = draft.agePrefAny ? [AGE_PREF_ANY] : draft.agePrefIds;
       if (ids.length === 0) {
@@ -399,25 +390,14 @@ export function SubmittedSurvey({
         </div>
       )}
 
-      {row(
-        'age',
-        '나이',
-        `${survey.age}세`,
-        <input
-          type="tel"
-          inputMode="numeric"
-          maxLength={2}
-          value={draft?.age ?? ''}
-          onChange={(e) =>
-            setDraft((prev) =>
-              prev
-                ? { ...prev, age: e.target.value.replace(/\D/g, '').slice(0, 2) }
-                : prev
-            )
-          }
-          className="w-full px-3 py-2 border border-[#F0D9DF] rounded-xl bg-[#FDE8EC] text-[15px] outline-none focus:border-[#E8526A] focus:bg-white"
-        />
-      )}
+      <div className="py-3 border-b border-[#F0D9DF]/80 text-left">
+        <p className="text-[11px] font-semibold tracking-wide text-[#8C7A8E] uppercase shrink-0 pt-0.5">
+          생년월일
+        </p>
+        <div className="mt-1.5 text-sm text-[#2B1B2E] leading-relaxed">
+          {survey.birth ? formatBirth(survey.birth) : '-'}
+        </div>
+      </div>
 
       {row(
         'agePref',

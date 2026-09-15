@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { phoneIsAdmin } from '@/lib/admin-auth';
+import { identityIsAdmin } from '@/lib/admin-auth';
 import { currentRegistrationRound } from '@/lib/deadline';
 import { loadEventTimes } from '@/lib/event-schedule';
 import { getSql } from '@/lib/db';
@@ -40,11 +40,12 @@ export async function GET(req: NextRequest) {
     authenticated: true,
     name: session.name,
     phone: formatKrPhone(session.phone),
+    birth: session.birth,
     submitted,
     rounds,
     round1SubmittedAt,
     round2SubmittedAt,
     matched,
-    isAdmin: await phoneIsAdmin(session.phone),
+    isAdmin: await identityIsAdmin(session),
   });
 }

@@ -42,6 +42,7 @@ import {
   AGE_PREF_SPECIFIC,
   type AgePrefSpecificId,
 } from '@/lib/age-pref';
+import { birthDigits, isValidBirth } from '@/lib/birth';
 import {
   STUDENT_NAME_MAX,
   STUDENT_NAME_MIN,
@@ -100,6 +101,7 @@ function NamePhoneLogin({
 }) {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
+  const [birth, setBirth] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
@@ -118,10 +120,14 @@ function NamePhoneLogin({
       setError('휴대폰 번호 형식(010-1234-5678)으로 입력해 주세요.');
       return;
     }
+    if (!isValidBirth(birth)) {
+      setError('생년월일은 6자리(YYMMDD)로 입력해 주세요.');
+      return;
+    }
     setSubmitting(true);
     setError('');
     try {
-      await loginWithNamePhone(trimmedName, phone);
+      await loginWithNamePhone(trimmedName, phone, birthDigits(birth));
       await onLoggedIn();
     } catch (err) {
       setError(err instanceof Error ? err.message : '로그인에 실패했습니다.');
@@ -167,11 +173,30 @@ function NamePhoneLogin({
           className="w-full px-4 py-3 border-1.5 border-[#F0D9DF] rounded-xl font-sans text-[16px] text-[#2B1B2E] bg-[#FDE8EC] outline-none placeholder-[#C9B0BE] focus:border-[#E8526A] focus:bg-white"
         />
       </div>
+      <div className="flex flex-col gap-1 text-left">
+        <label
+          htmlFor="login-birth"
+          className="text-xs font-semibold text-[#8C7A8E] tracking-wider uppercase"
+        >
+          생년월일
+        </label>
+        <input
+          id="login-birth"
+          type="tel"
+          inputMode="numeric"
+          autoComplete="bday"
+          maxLength={6}
+          value={birth}
+          onChange={(e) => setBirth(birthDigits(e.target.value))}
+          placeholder="예) 000315"
+          className="w-full px-4 py-3 border-1.5 border-[#F0D9DF] rounded-xl font-sans text-[16px] text-[#2B1B2E] bg-[#FDE8EC] outline-none placeholder-[#C9B0BE] focus:border-[#E8526A] focus:bg-white"
+        />
+      </div>
       {error ? (
         <p className="text-[13px] text-[#E8526A] leading-relaxed">{error}</p>
       ) : (
         <p className="text-[13px] leading-relaxed text-[#8C7A8E]">
-          접수할 때 쓴 이름과 전화번호로 로그인해요.
+          이름, 전화번호, 생년월일 6자리로 로그인해요.
         </p>
       )}
       <button
@@ -195,7 +220,6 @@ type FormData = {
   major: string;
   phone: string;
   gender: boolean | null;
-  age: string;
   agePref: AgePrefForm;
   mbti: string;
   haveCharmIds: string[];
@@ -210,7 +234,6 @@ type FieldKey =
   | 'major'
   | 'phone'
   | 'gender'
-  | 'age'
   | 'agePref'
   | 'mbti'
   | 'haveCharmIds'
@@ -222,7 +245,6 @@ const initialFormData: FormData = {
   major: '',
   phone: '',
   gender: null,
-  age: '',
   agePref: { any: false, ids: [] },
   mbti: 'ENTJ',
   haveCharmIds: [],
@@ -261,7 +283,6 @@ export default function Home({
     major: false,
     phone: false,
     gender: false,
-    age: false,
     agePref: false,
     mbti: false,
     haveCharmIds: false,
@@ -274,7 +295,6 @@ export default function Home({
     major: '',
     phone: '',
     gender: '',
-    age: '',
     agePref: '',
     mbti: '',
     haveCharmIds: '',
@@ -477,14 +497,6 @@ export default function Home({
           return '휴대폰 번호 형식(010-1234-5678)으로 입력해 주세요.';
         return '';
       }
-      case 'age': {
-        const v = typeof value === 'string' ? value.trim() : '';
-        if (!v) return '나이를 입력해 주세요.';
-        if (!/^\d+$/.test(v)) return '나이는 숫자만 입력해 주세요.';
-        const n = Number(v);
-        if (n < 17 || n > 40) return '나이는 17~40 사이로 입력해 주세요.';
-        return '';
-      }
       case 'agePref': {
         const v = value as AgePrefForm;
         if (v.any) return '';
@@ -523,9 +535,6 @@ export default function Home({
 
     if (name === 'phone') {
       finalValue = formatKrPhone(value);
-    }
-    if (name === 'age') {
-      finalValue = value.replace(/\D/g, '').slice(0, 2);
     }
 
     setFormData((prev) => ({ ...prev, [name]: finalValue }));
@@ -613,7 +622,6 @@ export default function Home({
       'major',
       'phone',
       'gender',
-      'age',
       'agePref',
       'mbti',
       'haveCharmIds',
@@ -626,7 +634,6 @@ export default function Home({
       major: true,
       phone: true,
       gender: true,
-      age: true,
       agePref: true,
       mbti: true,
       haveCharmIds: true,
@@ -639,7 +646,6 @@ export default function Home({
       major: validateField('major', formData.major),
       phone: validateField('phone', formData.phone),
       gender: validateField('gender', formData.gender),
-      age: validateField('age', formData.age),
       agePref: validateField('agePref', formData.agePref),
       mbti: validateField('mbti', formData.mbti),
       haveCharmIds: validateField('haveCharmIds', formData.haveCharmIds),
@@ -676,7 +682,6 @@ export default function Home({
         name: formData.name.trim(),
         phone: formData.phone.trim(),
         gender: formData.gender as boolean,
-        age: Number(formData.age),
         major_id: formData.major,
         age_pref_ids: formData.agePref.any
           ? [AGE_PREF_ANY]
@@ -713,7 +718,7 @@ export default function Home({
         setSubmitted(true);
       } else if (err instanceof ApiError && err.status === 401) {
         setAuthSession({ authenticated: false });
-        triggerToast('⚠️ 이름과 전화번호로 로그인해 주세요.');
+        triggerToast('⚠️ 이름·전화번호·생년월일로 로그인해 주세요.');
       } else {
         const message =
           err instanceof Error ? err.message : '서버 응답 오류';
@@ -769,7 +774,7 @@ export default function Home({
     }
   };
 
-  const textInputKeys = ['name', 'phone', 'age'] as const;
+  const textInputKeys = ['name', 'phone'] as const;
 
   const getInputClass = (fieldName: (typeof textInputKeys)[number]) => {
     const base =
@@ -914,7 +919,7 @@ export default function Home({
                 </>
               ) : (
                 <>
-                  이름과 전화번호로 로그인한 뒤
+                  이름·전화번호·생년월일로 로그인한 뒤
                   <br />
                   {registrationRound ? `${registrationRound}차 ` : ''}접수를 진행해 주세요.
                 </>
@@ -1224,47 +1229,6 @@ export default function Home({
                 >
                   {errors.gender ||
                     (formData.gender !== null ? '✓ 확인됐어요' : '')}
-                </p>
-              </div>
-
-              {/* Age */}
-              <div className="flex flex-col gap-1">
-                <label
-                  htmlFor="age"
-                  className="flex flex-wrap items-center gap-y-0.5 text-xs font-semibold text-[#8C7A8E] tracking-wider uppercase"
-                >
-                  <span>
-                    🎂 나이<span className="text-[#E8526A]">*</span>
-                  </span>
-                </label>
-                <div className="relative">
-                  <input
-                    type="tel"
-                    id="age"
-                    name="age"
-                    placeholder="예: 22"
-                    maxLength={2}
-                    inputMode="numeric"
-                    autoComplete="off"
-                    value={formData.age}
-                    onChange={handleChange}
-                    onBlur={handleBlur}
-                    className={`${getInputClass('age')} pr-12`}
-                  />
-                  {touched.age && (
-                    <span
-                      className={`absolute right-4 top-1/2 -translate-y-1/2 font-bold text-lg pointer-events-none transition-all duration-200 ${
-                        errors.age ? 'text-[#E8526A]' : 'text-[#4CAF82]'
-                      }`}
-                    >
-                      {errors.age ? '✕' : '✓'}
-                    </span>
-                  )}
-                </div>
-                <p
-                  className={`text-xs leading-relaxed transition-all duration-150 ${getHintDetails('age').style}`}
-                >
-                  {getHintDetails('age').text}
                 </p>
               </div>
 

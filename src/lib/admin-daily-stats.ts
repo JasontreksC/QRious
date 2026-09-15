@@ -116,15 +116,15 @@ export async function fetchAdminDailyStats(sql: Sql): Promise<AdminDailyStats> {
   const rows = await sql`
     WITH submitted AS (
       SELECT
-        s.round::int AS round,
+        r.round::int AS round,
         to_char(
           (MIN(c.consented_at) AT TIME ZONE 'Asia/Seoul'),
           'YYYY-MM-DD'
         ) AS day
-      FROM student s
-      INNER JOIN consent c ON c.student_id = s.student_id
+      FROM registration r
+      INNER JOIN consent c ON c.registration_id = r.registration_id
       WHERE c.notice_version NOT LIKE '%-tp'
-      GROUP BY s.student_id, s.round
+      GROUP BY r.registration_id, r.round
     )
     SELECT day, round, COUNT(*)::int AS count
     FROM submitted

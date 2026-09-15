@@ -73,7 +73,6 @@ export type SurveyPayload = {
   name: string;
   phone: string;
   gender: boolean;
-  age: number;
   major_id: string;
   mbti: string;
   age_pref_ids: string[];
@@ -89,15 +88,17 @@ export type SurveyPayload = {
 
 export type SurveyResponse = {
   student_id: string;
+  registration_id: string;
 };
 
 export type OwnSurvey = {
   student_id: string;
+  registration_id: string;
   round: 1 | 2;
   name: string;
   phone: string;
   gender: boolean;
-  age: number;
+  birth: string | null;
   mbti: string;
   major_id: string;
   major: string;
@@ -126,7 +127,6 @@ export type SurveyPatch = {
   name?: string;
   phone?: string;
   gender?: boolean;
-  age?: number;
   major_id?: string;
   mbti?: string;
   age_pref_ids?: string[];
@@ -176,11 +176,12 @@ export async function cancelSurvey(): Promise<void> {
 
 export type AdminStudent = {
   student_id: string;
+  registration_id: string;
   round: 1 | 2;
   name: string;
   phone: string;
   gender: boolean;
-  age: number | null;
+  birth: string | null;
   mbti: string;
   major: string | null;
   age_prefs: string[];
@@ -202,6 +203,7 @@ export type AuthSession =
       authenticated: true;
       name: string;
       phone: string;
+      birth: string;
       submitted: boolean;
       rounds: number[];
       round1SubmittedAt: string | null;
@@ -216,11 +218,12 @@ export async function getAuthSession(): Promise<AuthSession> {
 
 export async function loginWithNamePhone(
   name: string,
-  phone: string
+  phone: string,
+  birth: string
 ): Promise<void> {
   await request<{ ok: boolean }>('/api/auth/login', {
     method: 'POST',
-    body: JSON.stringify({ name, phone }),
+    body: JSON.stringify({ name, phone, birth }),
   });
 }
 
@@ -295,8 +298,8 @@ export async function deleteCharm(charmId: string): Promise<void> {
   });
 }
 
-export async function deleteAdminStudent(studentId: string): Promise<void> {
-  await request<{ ok: boolean }>(`/api/admin/students/${studentId}`, {
+export async function deleteAdminStudent(registrationId: string): Promise<void> {
+  await request<{ ok: boolean }>(`/api/admin/students/${registrationId}`, {
     method: 'DELETE',
   });
 }

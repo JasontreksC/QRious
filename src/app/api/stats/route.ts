@@ -14,11 +14,12 @@ export async function GET() {
     const rows = await sql`
       SELECT
         COUNT(*)::int AS total,
-        COUNT(*) FILTER (WHERE gender = false)::int AS male,
-        COUNT(*) FILTER (WHERE gender = true)::int AS female,
-        COUNT(DISTINCT major_id)::int AS major_count
-      FROM student
-      WHERE round = ${round}
+        COUNT(*) FILTER (WHERE s.gender = false)::int AS male,
+        COUNT(*) FILTER (WHERE s.gender = true)::int AS female,
+        COUNT(DISTINCT s.major_id)::int AS major_count
+      FROM registration r
+      JOIN student s ON s.student_id = r.student_id
+      WHERE r.round = ${round}
     `;
 
     const majorRows = await sql`
@@ -27,9 +28,10 @@ export async function GET() {
         m.name,
         m.short_name,
         COUNT(*)::int AS count
-      FROM student s
+      FROM registration r
+      JOIN student s ON s.student_id = r.student_id
       JOIN major m ON m.major_id = s.major_id
-      WHERE s.round = ${round}
+      WHERE r.round = ${round}
       GROUP BY m.major_id, m.name, m.short_name
       ORDER BY count DESC, m.name ASC
       LIMIT 10

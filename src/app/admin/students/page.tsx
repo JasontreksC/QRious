@@ -54,6 +54,7 @@ export default function AdminStudentsPage() {
       (s) =>
         s.name.toLowerCase().includes(q) ||
         s.phone.replace(/\D/g, '').includes(q.replace(/\D/g, '')) ||
+        (s.birth ?? '').includes(q.replace(/\D/g, '')) ||
         (s.major ?? '').toLowerCase().includes(q)
     );
   }, [students, query]);
@@ -87,19 +88,19 @@ export default function AdminStudentsPage() {
   const handleDelete = async (student: AdminStudent) => {
     if (
       !window.confirm(
-        `${student.name} 참가자를 삭제할까요?`
+        `${student.name} ${student.round}차 접수를 삭제할까요?`
       )
     ) {
       return;
     }
-    setBusyId(student.student_id);
+    setBusyId(student.registration_id);
     setError('');
     try {
-      await deleteAdminStudent(student.student_id);
+      await deleteAdminStudent(student.registration_id);
       setStudents((prev) =>
-        prev.filter((s) => s.student_id !== student.student_id)
+        prev.filter((s) => s.registration_id !== student.registration_id)
       );
-      if (expandedId === student.student_id) setExpandedId(null);
+      if (expandedId === student.registration_id) setExpandedId(null);
     } catch (err) {
       setError(
         err instanceof ApiError ? err.message : '삭제에 실패했습니다.'
@@ -186,16 +187,16 @@ export default function AdminStudentsPage() {
                 <th className="py-2 pr-3 font-semibold">학과</th>
                 <th className="py-2 pr-3 font-semibold">전화번호</th>
                 <th className="py-2 pr-3 font-semibold">성별</th>
-                <th className="py-2 pr-3 font-semibold">나이</th>
+                <th className="py-2 pr-3 font-semibold">생년월일</th>
                 <th className="py-2 pr-3 font-semibold">MBTI</th>
                 <th className="py-2 px-5 font-semibold text-right">관리</th>
               </tr>
             </thead>
             <tbody>
               {pageRows.map((student) => {
-                const open = expandedId === student.student_id;
+                const open = expandedId === student.registration_id;
                 return (
-                  <React.Fragment key={student.student_id}>
+                  <React.Fragment key={student.registration_id}>
                     <tr className="border-b border-[#F0D9DF]/80">
                       <td className="py-3 px-5">{student.name}</td>
                       <td className="py-3 pr-3">{student.round}차</td>
@@ -206,14 +207,18 @@ export default function AdminStudentsPage() {
                       <td className="py-3 pr-3">
                         {student.gender ? '여자' : '남자'}
                       </td>
-                      <td className="py-3 pr-3">{student.age ?? '-'}</td>
+                      <td className="py-3 pr-3 font-mono text-[13px]">
+                        {student.birth
+                          ? `${student.birth.slice(0, 2)}.${student.birth.slice(2, 4)}.${student.birth.slice(4, 6)}`
+                          : '-'}
+                      </td>
                       <td className="py-3 pr-3">{student.mbti || '-'}</td>
                       <td className="py-3 px-5 text-right">
                         <div className="flex justify-end gap-2">
                           <button
                             type="button"
                             onClick={() =>
-                              setExpandedId(open ? null : student.student_id)
+                              setExpandedId(open ? null : student.registration_id)
                             }
                             className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-[#F0D9DF] bg-[#FDE8EC] text-[#E8526A] hover:bg-[#fcdde3]"
                           >
@@ -221,7 +226,7 @@ export default function AdminStudentsPage() {
                           </button>
                           <button
                             type="button"
-                            disabled={busyId === student.student_id}
+                            disabled={busyId === student.registration_id}
                             onClick={() => handleDelete(student)}
                             className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-[#F0D9DF] bg-white text-[#8C7A8E] hover:bg-[#FEF0F2] hover:text-[#E8526A] disabled:opacity-40"
                           >

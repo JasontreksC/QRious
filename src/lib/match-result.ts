@@ -1,3 +1,4 @@
+import { birthToAge } from '@/lib/birth';
 import type { Sql } from '@/lib/db';
 import { getSql } from '@/lib/db';
 import { eventTimeMs, type EventTimes } from '@/lib/deadline';
@@ -59,24 +60,26 @@ async function loadMatchRows(
     return sql`
       SELECT
         COALESCE(mr.round, me.round) AS round,
-        partner.student_id,
+        partner_r.registration_id,
         partner.name,
         partner.phone,
         partner.gender,
-        partner.age,
-        partner.mbti,
+        partner.birth,
+        partner_r.mbti,
         major.name AS major
-      FROM student AS me
+      FROM registration AS me
+      JOIN student AS me_s ON me_s.student_id = me.student_id
       JOIN match_result AS mr
-        ON mr.male_id = me.student_id OR mr.female_id = me.student_id
-      JOIN student AS partner
-        ON partner.student_id = CASE
-          WHEN me.student_id = mr.male_id THEN mr.female_id
+        ON mr.male_id = me.registration_id OR mr.female_id = me.registration_id
+      JOIN registration AS partner_r
+        ON partner_r.registration_id = CASE
+          WHEN me.registration_id = mr.male_id THEN mr.female_id
           ELSE mr.male_id
         END
+      JOIN student AS partner ON partner.student_id = partner_r.student_id
       LEFT JOIN major ON major.major_id = partner.major_id
-      WHERE lower(btrim(me.name)) = ${keys.name}
-        AND regexp_replace(me.phone, '[^0-9]', '', 'g') = ${keys.phone}
+      WHERE lower(btrim(me_s.name)) = ${keys.name}
+        AND regexp_replace(me_s.phone, '[^0-9]', '', 'g') = ${keys.phone}
         AND me.round = ${round}
       ORDER BY COALESCE(mr.round, me.round) DESC, me.round DESC
       LIMIT 1
@@ -86,24 +89,26 @@ async function loadMatchRows(
   return sql`
     SELECT
       COALESCE(mr.round, me.round) AS round,
-      partner.student_id,
+      partner_r.registration_id,
       partner.name,
       partner.phone,
       partner.gender,
-      partner.age,
-      partner.mbti,
+      partner.birth,
+      partner_r.mbti,
       major.name AS major
-    FROM student AS me
+    FROM registration AS me
+    JOIN student AS me_s ON me_s.student_id = me.student_id
     JOIN match_result AS mr
-      ON mr.male_id = me.student_id OR mr.female_id = me.student_id
-    JOIN student AS partner
-      ON partner.student_id = CASE
-        WHEN me.student_id = mr.male_id THEN mr.female_id
+      ON mr.male_id = me.registration_id OR mr.female_id = me.registration_id
+    JOIN registration AS partner_r
+      ON partner_r.registration_id = CASE
+        WHEN me.registration_id = mr.male_id THEN mr.female_id
         ELSE mr.male_id
       END
+    JOIN student AS partner ON partner.student_id = partner_r.student_id
     LEFT JOIN major ON major.major_id = partner.major_id
-    WHERE lower(btrim(me.name)) = ${keys.name}
-      AND regexp_replace(me.phone, '[^0-9]', '', 'g') = ${keys.phone}
+    WHERE lower(btrim(me_s.name)) = ${keys.name}
+      AND regexp_replace(me_s.phone, '[^0-9]', '', 'g') = ${keys.phone}
     ORDER BY COALESCE(mr.round, me.round) DESC, me.round DESC
     LIMIT 1
   `;
@@ -113,12 +118,12 @@ async function partnerFromRow(
   sql: Sql,
   row: Record<string, unknown>
 ): Promise<MatchPartner> {
-  const partnerId = String(row.student_id);
+  const partnerId = String(row.registration_id);
   const haveRows = await sql`
     SELECT c.name
     FROM have h
     JOIN charm c ON c.charm_id = h.charm_id
-    WHERE h.student_id = ${partnerId}
+    WHERE h.registration_id = ${partnerId}
     ORDER BY c.name ASC
   `;
 
@@ -127,7 +132,7 @@ async function partnerFromRow(
     name: String(row.name ?? ''),
     phone: String(row.phone ?? ''),
     gender: Boolean(row.gender),
-    age: row.age == null ? null : Number(row.age),
+    age: row.birth ? birthToAge(String(row.birth)) : null,
     mbti: String(row.mbti ?? ''),
     major: row.major == null ? null : String(row.major),
     have: haveRows.map((item) => String(item.name ?? '')).filter(Boolean),
@@ -141,10 +146,11 @@ async function studentRoundsByIdentity(
   const keys = identityKeys(identity);
   if (!keys) return [];
   const rows = await sql`
-    SELECT round
-    FROM student
-    WHERE lower(btrim(name)) = ${keys.name}
-      AND regexp_replace(phone, '[^0-9]', '', 'g') = ${keys.phone}
+    SELECT r.round
+    FROM registration r
+    JOIN student s ON s.student_id = r.student_id
+    WHERE lower(btrim(s.name)) = ${keys.name}
+      AND regexp_replace(s.phone, '[^0-9]', '', 'g') = ${keys.phone}
   `;
   return rows
     .map((row) => Number(row.round))
@@ -163,11 +169,12 @@ export async function studentHasMatchByIdentity(
   const rounds = await studentRoundsByIdentity(identity, sql);
   const matchRows = await sql`
     SELECT me.round
-    FROM student AS me
+    FROM registration AS me
+    JOIN student AS me_s ON me_s.student_id = me.student_id
     JOIN match_result AS mr
-      ON mr.male_id = me.student_id OR mr.female_id = me.student_id
-    WHERE lower(btrim(me.name)) = ${keys.name}
-      AND regexp_replace(me.phone, '[^0-9]', '', 'g') = ${keys.phone}
+      ON mr.male_id = me.registration_id OR mr.female_id = me.registration_id
+    WHERE lower(btrim(me_s.name)) = ${keys.name}
+      AND regexp_replace(me_s.phone, '[^0-9]', '', 'g') = ${keys.phone}
   `;
   const matchRounds = new Set(
     matchRows

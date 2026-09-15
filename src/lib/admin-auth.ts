@@ -1,32 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSql } from '@/lib/db';
 import { jsonError } from '@/lib/http';
-import { phoneDigits } from '@/lib/phone';
-import { getSessionFromRequest } from '@/lib/session';
+import { nameKey, phoneDigits } from '@/lib/phone';
+import { getSessionFromRequest, type AppSession } from '@/lib/session';
 
-function adminPhonesFromEnv(): string[] {
-  return (process.env.ADMIN_PHONES ?? '')
-    .split(/[,\s]+/)
-    .map((value) => phoneDigits(value))
-    .filter(Boolean);
-}
-
-export async function phoneIsAdmin(phone: string): Promise<boolean> {
-  const normalized = phoneDigits(phone);
-  if (!normalized) return false;
-  if (adminPhonesFromEnv().includes(normalized)) return true;
+export async function identityIsAdmin(session: AppSession): Promise<boolean> {
+  const name = nameKey(session.name);
+  const phone = phoneDigits(session.phone);
+  const birth = session.birth;
+  if (!name || !phone || birth.length !== 6) return false;
   try {
     const sql = getSql();
     const rows = await sql`
       SELECT 1
       FROM admin
-      WHERE phone IS NOT NULL
-        AND regexp_replace(phone, '[^0-9]', '', 'g') = ${normalized}
+      WHERE name IS NOT NULL
+        AND phone IS NOT NULL
+        AND birth IS NOT NULL
+        AND lower(btrim(name)) = ${name}
+        AND regexp_replace(phone, '[^0-9]', '', 'g') = ${phone}
+        AND birth = ${birth}
       LIMIT 1
     `;
     return rows.length > 0;
   } catch (err) {
-    console.error('phoneIsAdmin', err);
+    console.error('identityIsAdmin', err);
     return false;
   }
 }
@@ -34,7 +32,7 @@ export async function phoneIsAdmin(phone: string): Promise<boolean> {
 export async function sessionIsAdmin(req: NextRequest): Promise<boolean> {
   const session = getSessionFromRequest(req);
   if (!session) return false;
-  return phoneIsAdmin(session.phone);
+  return identityIsAdmin(session);
 }
 
 export function unauthorized() {

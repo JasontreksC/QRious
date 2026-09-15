@@ -25,7 +25,7 @@ import { currentRegistrationRound } from '@/lib/deadline';
 import { loadEventTimes } from '@/lib/event-schedule';
 import { getSql } from '@/lib/db';
 import { isUniqueViolation, jsonError } from '@/lib/http';
-import { loadOwnSurvey } from '@/lib/own-survey';
+import { deleteOrphanStudent, loadOwnSurvey } from '@/lib/own-survey';
 import { formatKrPhone, isValidKrPhone, nameKey, phoneDigits } from '@/lib/phone';
 import {
   SESSION_COOKIE,
@@ -51,7 +51,6 @@ type SurveyBody = {
   name?: unknown;
   phone?: unknown;
   gender?: unknown;
-  age?: unknown;
   major?: unknown;
   major_id?: unknown;
   mbti?: unknown;
@@ -138,7 +137,7 @@ export async function POST(req: NextRequest) {
     return jsonError(400, 'VALIDATION_ERROR', 'JSON 본문이 올바르지 않습니다.');
   }
 
-  const studentId = randomUUID();
+  const registrationId = randomUUID();
   const name = parseSubmittedName(body.name) ?? parseSubmittedName(session.name);
   const majorId =
     asTrimmedString(body.major_id) ?? asTrimmedString(body.major);
@@ -165,13 +164,8 @@ export async function POST(req: NextRequest) {
   if (typeof body.gender !== 'boolean') {
     return jsonError(400, 'VALIDATION_ERROR', '성별을 선택해 주세요.');
   }
-  if (
-    typeof body.age !== 'number' ||
-    !Number.isInteger(body.age) ||
-    body.age < 17 ||
-    body.age > 40
-  ) {
-    return jsonError(400, 'VALIDATION_ERROR', '나이를 올바르게 입력해 주세요.');
+  if (!session.birth) {
+    return jsonError(401, 'UNAUTHORIZED', '이름과 전화번호로 로그인해 주세요.');
   }
   if (!mbti || !MBTI_OPTIONS.has(mbti)) {
     return jsonError(400, 'VALIDATION_ERROR', 'MBTI를 올바르게 선택해 주세요.');
@@ -230,7 +224,7 @@ export async function POST(req: NextRequest) {
   }
 
   const gender = body.gender;
-  const age = body.age;
+  const birth = session.birth;
 
   try {
     const allCharmIds = [...new Set([...haveCharmIds, ...wantCharmIds])];
@@ -248,20 +242,32 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const duplicateStudent = await sql`
+    const existingPerson = await sql`
       SELECT student_id
       FROM student
       WHERE lower(btrim(name)) = ${nameKey(name)}
         AND regexp_replace(phone, '[^0-9]', '', 'g') = ${phoneDigits(phone)}
-        AND round = ${round}
       LIMIT 1
     `;
-    if (duplicateStudent.length > 0) {
-      return jsonError(
-        409,
-        'DUPLICATE_STUDENT',
-        `이미 ${round}차 접수를 완료했습니다.`
-      );
+    const studentId = existingPerson[0]
+      ? String(existingPerson[0].student_id)
+      : randomUUID();
+    const isNewPerson = existingPerson.length === 0;
+
+    if (!isNewPerson) {
+      const duplicateRound = await sql`
+        SELECT registration_id
+        FROM registration
+        WHERE student_id = ${studentId} AND round = ${round}
+        LIMIT 1
+      `;
+      if (duplicateRound.length > 0) {
+        return jsonError(
+          409,
+          'DUPLICATE_STUDENT',
+          `이미 ${round}차 접수를 완료했습니다.`
+        );
+      }
     }
 
     const existingPrefs = await sql`
@@ -288,43 +294,56 @@ export async function POST(req: NextRequest) {
     }
 
     const queries = [
+      isNewPerson
+        ? sql`
+            INSERT INTO student (student_id, name, phone, gender, birth, major_id)
+            VALUES (
+              ${studentId}, ${name}, ${phone}, ${gender}, ${birth}, ${majorId}
+            )
+          `
+        : sql`
+            UPDATE student
+            SET name = ${name},
+                phone = ${phone},
+                gender = ${gender},
+                birth = ${birth},
+                major_id = ${majorId}
+            WHERE student_id = ${studentId}
+          `,
       sql`
-        INSERT INTO student (student_id, name, phone, gender, age, mbti, major_id, round)
-        VALUES (
-          ${studentId}, ${name}, ${phone}, ${gender}, ${age}, ${mbti},
-          ${majorId}, ${round}
-        )
+        INSERT INTO registration (registration_id, student_id, round, mbti)
+        VALUES (${registrationId}, ${studentId}, ${round}, ${mbti})
       `,
       ...agePrefIds.map(
         (prefId) => sql`
-          INSERT INTO prefer_age (student_id, age_pref_id)
-          VALUES (${studentId}, ${prefId})
+          INSERT INTO prefer_age (registration_id, age_pref_id)
+          VALUES (${registrationId}, ${prefId})
         `
       ),
       ...haveCharmIds.map(
         (charmId) => sql`
-          INSERT INTO have (student_id, charm_id)
-          VALUES (${studentId}, ${charmId})
+          INSERT INTO have (registration_id, charm_id)
+          VALUES (${registrationId}, ${charmId})
         `
       ),
       ...wantCharmIds.map(
         (charmId) => sql`
-          INSERT INTO want (student_id, charm_id)
-          VALUES (${studentId}, ${charmId})
+          INSERT INTO want (registration_id, charm_id)
+          VALUES (${registrationId}, ${charmId})
         `
       ),
     ];
 
     if (exHave) {
       queries.push(sql`
-        INSERT INTO ex_have (student_id, charm)
-        VALUES (${studentId}, ${exHave})
+        INSERT INTO ex_have (registration_id, charm)
+        VALUES (${registrationId}, ${exHave})
       `);
     }
     if (exWant) {
       queries.push(sql`
-        INSERT INTO ex_want (student_id, charm)
-        VALUES (${studentId}, ${exWant})
+        INSERT INTO ex_want (registration_id, charm)
+        VALUES (${registrationId}, ${exWant})
       `);
     }
 
@@ -374,11 +393,11 @@ export async function POST(req: NextRequest) {
 
     queries.push(sql`
       INSERT INTO consent (
-        student_id, notice_version, agreed, consent_text_snapshot,
+        registration_id, notice_version, agreed, consent_text_snapshot,
         consent_hash, ip_address, user_agent
       )
       VALUES (
-        ${studentId},
+        ${registrationId},
         ${CONSENT_VERSION},
         true,
         ${CONSENT_BODY},
@@ -390,11 +409,11 @@ export async function POST(req: NextRequest) {
 
     queries.push(sql`
       INSERT INTO consent (
-        student_id, notice_version, agreed, consent_text_snapshot,
+        registration_id, notice_version, agreed, consent_text_snapshot,
         consent_hash, ip_address, user_agent
       )
       VALUES (
-        ${studentId},
+        ${registrationId},
         ${THIRD_PARTY_CONSENT_VERSION},
         true,
         ${THIRD_PARTY_CONSENT_BODY},
@@ -406,8 +425,11 @@ export async function POST(req: NextRequest) {
 
     await sql.transaction(queries);
 
-    const res = NextResponse.json({ student_id: studentId }, { status: 201 });
-    const token = encodeSession({ name, phone });
+    const res = NextResponse.json(
+      { student_id: studentId, registration_id: registrationId },
+      { status: 201 }
+    );
+    const token = encodeSession({ name, phone, birth: session.birth });
     if (token) res.cookies.set(SESSION_COOKIE, token, sessionCookieOptions());
     return res;
   } catch (err) {
@@ -458,7 +480,6 @@ export async function PATCH(req: NextRequest) {
     !has('name') &&
     !has('phone') &&
     !has('gender') &&
-    !has('age') &&
     !has('major') &&
     !has('major_id') &&
     !has('mbti') &&
@@ -474,15 +495,19 @@ export async function PATCH(req: NextRequest) {
   try {
     const sql = roundSql;
     const existing = await sql`
-      SELECT student_id
-      FROM student
-      WHERE lower(btrim(name)) = ${nameKey(session.name)}
-        AND regexp_replace(phone, '[^0-9]', '', 'g') = ${phoneDigits(session.phone)}
-        AND round = ${round}
+      SELECT r.registration_id, r.student_id
+      FROM registration r
+      JOIN student s ON s.student_id = r.student_id
+      WHERE lower(btrim(s.name)) = ${nameKey(session.name)}
+        AND regexp_replace(s.phone, '[^0-9]', '', 'g') = ${phoneDigits(session.phone)}
+        AND r.round = ${round}
       LIMIT 1
     `;
+    const registrationId = existing[0]
+      ? String(existing[0].registration_id)
+      : '';
     const studentId = existing[0] ? String(existing[0].student_id) : '';
-    if (!studentId) {
+    if (!registrationId || !studentId) {
       return jsonError(404, 'NOT_FOUND', '접수 내역이 없습니다.');
     }
 
@@ -526,20 +551,6 @@ export async function PATCH(req: NextRequest) {
       `);
     }
 
-    if (has('age')) {
-      if (
-        typeof body.age !== 'number' ||
-        !Number.isInteger(body.age) ||
-        body.age < 17 ||
-        body.age > 40
-      ) {
-        return jsonError(400, 'VALIDATION_ERROR', '나이를 올바르게 입력해 주세요.');
-      }
-      queries.push(sql`
-        UPDATE student SET age = ${body.age} WHERE student_id = ${studentId}
-      `);
-    }
-
     if (has('major_id') || has('major')) {
       const majorId =
         asTrimmedString(body.major_id) ?? asTrimmedString(body.major);
@@ -563,7 +574,7 @@ export async function PATCH(req: NextRequest) {
         return jsonError(400, 'VALIDATION_ERROR', 'MBTI를 올바르게 선택해 주세요.');
       }
       queries.push(sql`
-        UPDATE student SET mbti = ${mbti} WHERE student_id = ${studentId}
+        UPDATE registration SET mbti = ${mbti} WHERE registration_id = ${registrationId}
       `);
     }
 
@@ -588,11 +599,11 @@ export async function PATCH(req: NextRequest) {
           '선호 연령 조건이 올바르지 않습니다.'
         );
       }
-      queries.push(sql`DELETE FROM prefer_age WHERE student_id = ${studentId}`);
+      queries.push(sql`DELETE FROM prefer_age WHERE registration_id = ${registrationId}`);
       for (const prefId of agePrefIds) {
         queries.push(sql`
-          INSERT INTO prefer_age (student_id, age_pref_id)
-          VALUES (${studentId}, ${prefId})
+          INSERT INTO prefer_age (registration_id, age_pref_id)
+          VALUES (${registrationId}, ${prefId})
         `);
       }
     }
@@ -618,11 +629,11 @@ export async function PATCH(req: NextRequest) {
           '존재하지 않는 매력 태그가 포함되어 있습니다.'
         );
       }
-      queries.push(sql`DELETE FROM have WHERE student_id = ${studentId}`);
+      queries.push(sql`DELETE FROM have WHERE registration_id = ${registrationId}`);
       for (const charmId of haveCharmIds) {
         queries.push(sql`
-          INSERT INTO have (student_id, charm_id)
-          VALUES (${studentId}, ${charmId})
+          INSERT INTO have (registration_id, charm_id)
+          VALUES (${registrationId}, ${charmId})
         `);
       }
     }
@@ -648,11 +659,11 @@ export async function PATCH(req: NextRequest) {
           '존재하지 않는 매력 태그가 포함되어 있습니다.'
         );
       }
-      queries.push(sql`DELETE FROM want WHERE student_id = ${studentId}`);
+      queries.push(sql`DELETE FROM want WHERE registration_id = ${registrationId}`);
       for (const charmId of wantCharmIds) {
         queries.push(sql`
-          INSERT INTO want (student_id, charm_id)
-          VALUES (${studentId}, ${charmId})
+          INSERT INTO want (registration_id, charm_id)
+          VALUES (${registrationId}, ${charmId})
         `);
       }
     }
@@ -660,11 +671,11 @@ export async function PATCH(req: NextRequest) {
     if (has('ex_have')) {
       const exHave =
         typeof body.ex_have === 'string' ? body.ex_have.trim() : '';
-      queries.push(sql`DELETE FROM ex_have WHERE student_id = ${studentId}`);
+      queries.push(sql`DELETE FROM ex_have WHERE registration_id = ${registrationId}`);
       if (exHave) {
         queries.push(sql`
-          INSERT INTO ex_have (student_id, charm)
-          VALUES (${studentId}, ${exHave})
+          INSERT INTO ex_have (registration_id, charm)
+          VALUES (${registrationId}, ${exHave})
         `);
       }
     }
@@ -672,11 +683,11 @@ export async function PATCH(req: NextRequest) {
     if (has('ex_want')) {
       const exWant =
         typeof body.ex_want === 'string' ? body.ex_want.trim() : '';
-      queries.push(sql`DELETE FROM ex_want WHERE student_id = ${studentId}`);
+      queries.push(sql`DELETE FROM ex_want WHERE registration_id = ${registrationId}`);
       if (exWant) {
         queries.push(sql`
-          INSERT INTO ex_want (student_id, charm)
-          VALUES (${studentId}, ${exWant})
+          INSERT INTO ex_want (registration_id, charm)
+          VALUES (${registrationId}, ${exWant})
         `);
       }
     }
@@ -701,7 +712,11 @@ export async function PATCH(req: NextRequest) {
     }
     const res = NextResponse.json(survey);
     if (has('name') || has('phone')) {
-      const token = encodeSession({ name: survey.name, phone: survey.phone });
+      const token = encodeSession({
+        name: survey.name,
+        phone: survey.phone,
+        birth: session.birth,
+      });
       if (token) res.cookies.set(SESSION_COOKIE, token, sessionCookieOptions());
     }
     return res;
@@ -734,15 +749,18 @@ export async function DELETE(req: NextRequest) {
 
   try {
     const deleted = await sql`
-      DELETE FROM student
-      WHERE lower(btrim(name)) = ${nameKey(session.name)}
-        AND regexp_replace(phone, '[^0-9]', '', 'g') = ${phoneDigits(session.phone)}
-        AND round = ${round}
-      RETURNING student_id
+      DELETE FROM registration r
+      USING student s
+      WHERE r.student_id = s.student_id
+        AND lower(btrim(s.name)) = ${nameKey(session.name)}
+        AND regexp_replace(s.phone, '[^0-9]', '', 'g') = ${phoneDigits(session.phone)}
+        AND r.round = ${round}
+      RETURNING r.student_id
     `;
     if (deleted.length === 0) {
       return jsonError(404, 'NOT_FOUND', '접수 내역이 없습니다.');
     }
+    await deleteOrphanStudent(sql, String(deleted[0].student_id));
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error('DELETE /api/surveys', err);

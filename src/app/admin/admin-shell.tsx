@@ -65,7 +65,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
             <p className="text-sm text-[#8C7A8E] leading-relaxed">
               {session?.authenticated
                 ? '이 계정은 관리자 권한이 없어요.'
-                : '홈에서 이름과 전화번호로 로그인한 뒤, 관리자 전화번호로 등록된 계정만 이 페이지를 볼 수 있어요.'}
+                : '홈에서 이름·전화번호·생년월일로 로그인한 뒤, 관리자로 등록된 계정만 이 페이지를 볼 수 있어요.'}
             </p>
             {!session?.authenticated && (
               <Link

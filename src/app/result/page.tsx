@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
-import { phoneIsAdmin } from '@/lib/admin-auth';
+import { identityIsAdmin } from '@/lib/admin-auth';
 import { formatKstMonthDayTime, getRound2CtaState, isAwaitingAnnouncement } from '@/lib/deadline';
 import { loadEventTimes } from '@/lib/event-schedule';
 import { getSessionFromCookies } from '@/lib/session';
@@ -33,7 +33,7 @@ export default async function MatchResultPage() {
     redirect('/');
   }
 
-  const isAdmin = await phoneIsAdmin(session.phone);
+  const isAdmin = await identityIsAdmin(session);
   const hasRound2 = await studentHasRoundByIdentity(session, 2, sql);
   const round2Cta = getRound2CtaState(hasRound2, Date.now(), times);
 

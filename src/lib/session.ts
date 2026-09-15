@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from 'crypto';
 import { cookies } from 'next/headers';
 import { NextRequest } from 'next/server';
+import { normalizeBirth } from '@/lib/birth';
 import { phoneDigits } from '@/lib/phone';
 
 export const SESSION_COOKIE = 'qrious_session';
@@ -11,6 +12,7 @@ const SESSION_MAX_AGE_SEC = 60 * 60 * 24 * 7;
 export type AppSession = {
   name: string;
   phone: string;
+  birth: string;
   exp: number;
 };
 
@@ -61,13 +63,17 @@ function signPayload(encoded: string, secret: string): string {
 export function encodeSession(session: Omit<AppSession, 'exp'>): string | null {
   const secret = getAuthSecret();
   if (!secret) return null;
+  const birth = normalizeBirth(session.birth);
   const payload: AppSession = {
     name: normalizeSessionName(session.name),
     phone: phoneDigits(session.phone),
+    birth: birth ?? '',
     exp: Math.floor(Date.now() / 1000) + SESSION_MAX_AGE_SEC,
   };
-  if (!payload.name || !payload.phone) return null;
-  const encoded = Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url');
+  if (!payload.name || !payload.phone || !payload.birth) return null;
+  const encoded = Buffer.from(JSON.stringify(payload), 'utf8').toString(
+    'base64url'
+  );
   return `${encoded}.${signPayload(encoded, secret)}`;
 }
 
@@ -85,6 +91,7 @@ export function decodeSession(token: string | undefined): AppSession | null {
     if (
       typeof parsed.name !== 'string' ||
       typeof parsed.phone !== 'string' ||
+      typeof parsed.birth !== 'string' ||
       typeof parsed.exp !== 'number'
     ) {
       return null;
@@ -92,8 +99,9 @@ export function decodeSession(token: string | undefined): AppSession | null {
     if (parsed.exp * 1000 < Date.now()) return null;
     const name = normalizeSessionName(parsed.name);
     const phone = phoneDigits(parsed.phone);
-    if (!name || !phone) return null;
-    return { name, phone, exp: parsed.exp };
+    const birth = normalizeBirth(parsed.birth);
+    if (!name || !phone || !birth) return null;
+    return { name, phone, birth, exp: parsed.exp };
   } catch {
     return null;
   }

@@ -1,6 +1,6 @@
 /** 개인정보 보호법 필수 고지 항목을 담은 동의문 (버전 관리). */
 
-export const CONSENT_VERSION = '2026.09.15-1';
+export const CONSENT_VERSION = '2026.09.15-2';
 
 export const CONSENT_TITLE = '개인정보 수집·이용 동의서';
 
@@ -10,7 +10,7 @@ export const CONSENT_PURPOSE =
   'QR 소개팅 사전접수 접수 확인, 참가자 식별, 매칭 수행 및 행사 안내 연락';
 
 export const CONSENT_ITEMS =
-  '학과, 이름, 전화번호, 성별, 나이, 선호 연령 조건, MBTI, 본인 매력 태그(have), 이상형 매력 태그(want)';
+  '학과, 이름, 전화번호, 성별, 생년월일, 선호 연령 조건, MBTI, 본인 매력 태그(have), 이상형 매력 태그(want)';
 
 export const CONSENT_OPTIONAL_ITEMS =
   '추가로 적어 주시는 자기소개(매력·취미·좋아하는 것 등), 추가로 적어 주시는 이상형(취미·취향 등)';
