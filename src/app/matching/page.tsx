@@ -85,13 +85,12 @@ export default function MatchingGuidePage() {
         <section className={styles.matchingSection}>
           <h2>3. 직접 적어 주신 이야기</h2>
           <p className={styles.matchingCopy}>
-            태그로 다 담기지 않는 매력, 취미, 좋아하는 것은 추가로 적어 주신 문장으로 봐요.
-            예를 들어 “동물을 좋아하는 사람이 이상형이에요”와
-            “강아지를 키워요. 함께 산책하면 즐거울 거예요”처럼요.
+            마지막으로 추가로 적어 주신 매력, 취미등이 서로 얼마나 잘 맞는지 평가해요. 
+            최신 AI 모델인 GPT 5.6 Luna가 직접 읽고 분석합니다.
           </p>
           <figure className={styles.matchingFigure}>
             <Image
-              src="/images/ex_score.png"
+              src="/images/ex_score_new.png"
               alt="상대에게 바라는 이야기와 내가 적어 준 매력·취미·좋아하는 것을 AI가 비교해 점수로 만드는 그림"
               width={1474}
               height={1352}
@@ -99,18 +98,21 @@ export default function MatchingGuidePage() {
             />
           </figure>
           <p className={styles.matchingCopy}>
-            AI가 성격의 조화, 대화 방식, 에너지, 유머 코드, 외적인 취향
-            다섯 가지를 살펴요.
-            완전히 맞으면 높은 점수, 방향만 비슷하면 중간,
-            같은 주제인데 서로 반대면 낮은 점수예요.
-            아예 공통 주제가 없으면 그 기준은 평균에 넣지 않아요.
-            관련 없는 이야기로 손해를 보지 않게 하려는 거예요.
+            점수는 0점, 0.5점, 1점으로 셋 중 하나에요.
+            A가 원하는 것과 B가 가진 것, 두 문장을 두 단계에 걸쳐 파악해요.
+            <br />
+            1. 관련이 있는가?
+            <br />
+            → 없으면 0점, 있으면 다음 단계로 넘어가요.
+            <br />
+            2. 얼마나 비슷한가?
+            <br />
+            → 반대면 0점, 비슷하면 0.5점, 같으면 1점이에요.
           </p>
           <p className={styles.matchingNote}>
-            태그 점수와 같이, 여기도 A→B와 B→A를 따로 본 뒤
-            조화평균으로 하나의 점수를 만들어요.
-            내가 상대 이야기에 끌리고, 상대도 내 이야기에 끌릴 때
-            점수가 살아나요.
+            이번에도 A→B와 B→A를 각각 점수를 내지만, 태그 점수와 달리 조화평균이 아닌 산술평균으로 합쳐요.
+            자유 텍스트 입력은 태그보다 훨씬 다양한 주제를 다룰 수 있기 때문에, 태그보다 점수가 나올 확률이 낮아요.
+            그래서 한 방향이라도 맞는 부분이 있으면 그것을 살리기로 했어요.
           </p>
         </section>
 
