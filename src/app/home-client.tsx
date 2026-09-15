@@ -401,6 +401,27 @@ export default function Home({
     fetchMajors();
   }, []);
 
+  const applyAuthenticatedSession = (session: AuthSession) => {
+    if (
+      session.authenticated &&
+      session.matched &&
+      !applyRound2
+    ) {
+      window.location.replace('/result');
+      return true;
+    }
+    setAuthSession(session);
+    if (session.authenticated) {
+      if (session.submitted) setSubmitted(true);
+      setFormData((prev) => ({
+        ...prev,
+        name: prev.name || session.name,
+        phone: prev.phone || session.phone,
+      }));
+    }
+    return false;
+  };
+
   useEffect(() => {
     if (awaitingAnnouncement) {
       setAuthLoading(false);
@@ -412,29 +433,16 @@ export default function Home({
     let cancelled = false;
     setAuthLoading(true);
     (async () => {
+      let holdForResult = false;
       try {
         const session = await getAuthSession();
         if (cancelled) return;
-        if (session.authenticated) {
-          setAuthSession(session);
-          if (session.matched && !applyRound2) {
-            window.location.replace('/result');
-            return;
-          }
-          if (session.submitted) setSubmitted(true);
-          setFormData((prev) => ({
-            ...prev,
-            name: prev.name || session.name,
-            phone: prev.phone || session.phone,
-          }));
-        } else {
-          setAuthSession(session);
-        }
+        holdForResult = applyAuthenticatedSession(session);
       } catch (err) {
         console.error('Error fetching session:', err);
         if (!cancelled) setAuthSession({ authenticated: false });
       } finally {
-        if (!cancelled) setAuthLoading(false);
+        if (!cancelled && !holdForResult) setAuthLoading(false);
       }
     })();
 
@@ -931,19 +939,13 @@ export default function Home({
             {showLogin ? (
               <NamePhoneLogin
                 onLoggedIn={async () => {
-                  const session = await getAuthSession();
-                  setAuthSession(session);
-                  if (session.authenticated) {
-                    if (session.matched && !applyRound2) {
-                      window.location.replace('/result');
-                      return;
-                    }
-                    if (session.submitted) setSubmitted(true);
-                    setFormData((prev) => ({
-                      ...prev,
-                      name: prev.name || session.name,
-                      phone: prev.phone || session.phone,
-                    }));
+                  setAuthLoading(true);
+                  let holdForResult = false;
+                  try {
+                    const session = await getAuthSession();
+                    holdForResult = applyAuthenticatedSession(session);
+                  } finally {
+                    if (!holdForResult) setAuthLoading(false);
                   }
                 }}
               />
