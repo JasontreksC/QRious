@@ -103,7 +103,8 @@ export async function loadEventTimes(sql?: Sql): Promise<EventTimes> {
     if (!row) return { ...DEFAULT_EVENT_TIMES };
     return rowToTimes(row);
   } catch (err) {
-    console.error('loadEventTimes', err);
+    const message = err instanceof Error ? err.message : String(err);
+    console.error('loadEventTimes', message);
     return { ...DEFAULT_EVENT_TIMES };
   }
 }

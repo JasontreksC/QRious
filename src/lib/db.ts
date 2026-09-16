@@ -1,4 +1,41 @@
-import { neon } from '@neondatabase/serverless';
+import { setDefaultResultOrder } from 'node:dns';
+import { neon, neonConfig } from '@neondatabase/serverless';
+
+try {
+  setDefaultResultOrder('ipv4first');
+} catch {
+  // Edge/runtime without dns order control.
+}
+
+function isTransientFetchError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  const cause = (err as Error & { cause?: { code?: string; name?: string } })
+    .cause;
+  if (cause?.code === 'UND_ERR_CONNECT_TIMEOUT') return true;
+  if (cause?.name === 'ConnectTimeoutError') return true;
+  return err.message.includes('fetch failed');
+}
+
+async function fetchWithRetry(
+  input: RequestInfo | URL,
+  init?: RequestInit
+): Promise<Response> {
+  const attempts = 3;
+  let lastError: unknown;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      return await fetch(input, init);
+    } catch (err) {
+      lastError = err;
+      const last = attempt === attempts - 1;
+      if (!isTransientFetchError(err) || last) throw err;
+      await new Promise((resolve) => setTimeout(resolve, 400 * 2 ** attempt));
+    }
+  }
+  throw lastError;
+}
+
+neonConfig.fetchFunction = fetchWithRetry;
 
 function getDatabaseUrl(): string {
   const url = process.env.DATABASE_URL?.trim();
@@ -10,9 +47,12 @@ function getDatabaseUrl(): string {
   return url;
 }
 
+let cached: ReturnType<typeof neon> | null = null;
+
 /** Neon SQL client (HTTP). Use only on the server. */
 export function getSql() {
-  return neon(getDatabaseUrl());
+  if (!cached) cached = neon(getDatabaseUrl());
+  return cached;
 }
 
 export type Sql = ReturnType<typeof getSql>;

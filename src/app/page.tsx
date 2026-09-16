@@ -28,8 +28,15 @@ export default async function HomePage({
     apply === '2' && currentRegistrationRound(Date.now(), times) === 2;
 
   if (session && !applyRound2) {
-    const sql = getSql();
-    if (await studentHasMatchByIdentity(session, sql)) {
+    let matched = false;
+    try {
+      const sql = getSql();
+      matched = await studentHasMatchByIdentity(session, sql);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('HomePage match lookup', message);
+    }
+    if (matched) {
       redirect('/result');
     }
   }
