@@ -192,19 +192,18 @@ function NamePhoneLogin({
           className="w-full px-4 py-3 border-1.5 border-[#F0D9DF] rounded-xl font-sans text-[16px] text-[#2B1B2E] bg-[#FDE8EC] outline-none placeholder-[#C9B0BE] focus:border-[#E8526A] focus:bg-white"
         />
       </div>
+      <p className="text-[13px] leading-relaxed font-medium text-[#E8526A]">
+        본인의 정보만 입력해주세요. 타인 명의를 도용할 시 법적 책임이 발생할 수 있습니다.
+      </p>
       {error ? (
         <p className="text-[13px] text-[#E8526A] leading-relaxed">{error}</p>
-      ) : (
-        <p className="text-[13px] leading-relaxed text-[#8C7A8E]">
-          이름, 전화번호, 생년월일 6자리로 로그인해요.
-        </p>
-      )}
+      ) : null}
       <button
         type="submit"
         disabled={submitting}
         className="w-full inline-flex items-center justify-center min-h-[52px] px-5 py-3.5 bg-white border border-[#F0D9DF] hover:bg-[#FDE8EC] text-[#2B1B2E] text-[16px] font-semibold rounded-xl transition-colors duration-200 disabled:opacity-50"
       >
-        {submitting ? '로그인 중…' : '로그인'}
+        {submitting ? '접수하러 가는 중…' : '접수하러 가기'}
       </button>
     </form>
   );
@@ -1282,7 +1281,6 @@ export default function Home({
                         )}
                       >
                         {charm.name}
-                        {formData.haveCharmIds.includes(charm.charm_id) && ' ✓'}
                       </button>
                     ))}
                   </div>
@@ -1375,7 +1373,6 @@ export default function Home({
                         )}
                       >
                         {charm.name}
-                        {formData.wantCharmIds.includes(charm.charm_id) && ' ✓'}
                       </button>
                     ))}
                   </div>
