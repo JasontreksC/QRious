@@ -47,11 +47,15 @@ function getDatabaseUrl(): string {
   return url;
 }
 
-let cached: ReturnType<typeof neon> | null = null;
+function createSql() {
+  return neon(getDatabaseUrl());
+}
+
+let cached: ReturnType<typeof createSql> | null = null;
 
 /** Neon SQL client (HTTP). Use only on the server. */
 export function getSql() {
-  if (!cached) cached = neon(getDatabaseUrl());
+  if (!cached) cached = createSql();
   return cached;
 }
 
