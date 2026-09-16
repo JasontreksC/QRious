@@ -198,14 +198,12 @@ OAuth 콜백이 실패하면 JSON 대신 홈으로 리다이렉트하며 `?error
 ## 4. POST `/api/surveys`
 
 `qrious_session` 쿠키(이름+전화+생년월일)가 없으면 `401 UNAUTHORIZED`입니다.  
-저장되는 이름은 요청 본문의 `name`입니다. 생년월일(`student.birth`, YYMMDD)은 로그인 세션에서 복사합니다. `student_id`는 사람 PK, `registration_id`는 이번 차수 접수 PK입니다. 이미 같은 이름+전화로 등록된 사람이면 인적사항을 갱신하고 새 접수만 추가합니다.
+이름·전화번호·생년월일(`student.name`/`phone`/`birth`)은 로그인 세션에서만 가져오며 요청 본문으로 바꾸지 않습니다. `student_id`는 사람 PK, `registration_id`는 이번 차수 접수 PK입니다. 이미 같은 이름+전화로 등록된 사람이면 성별·학과를 갱신하고 새 접수만 추가합니다.
 
 ### Request body
 
 | 필드 | 타입 | 필수 | ERD |
 |------|------|------|-----|
-| `name` | string | O | `student.name` — 2~20자 |
-| `phone` | string | O | `student.phone` |
 | `gender` | boolean | O | `student.gender` |
 | `major_id` | string | O | `student.major_id` → `major` |
 | `age_pref_ids` | string[] | O | `prefer_age` — `['any']` 또는 `younger`/`same`/`older` 조합 |
@@ -268,9 +266,9 @@ OAuth 콜백이 실패하면 JSON 대신 홈으로 리다이렉트하며 `?error
 
 본인 접수의 일부 필드만 수정합니다. 보낸 키만 갱신합니다.
 
-허용 키: `name`, `phone`, `gender`, `major_id`, `mbti`, `age_pref_ids`, `have_charm_ids`, `want_charm_ids`, `ex_have`, `ex_want`.
+허용 키: `gender`, `major_id`, `mbti`, `age_pref_ids`, `have_charm_ids`, `want_charm_ids`, `ex_have`, `ex_want`.
 
-성공 시 GET과 같은 본문을 반환합니다. 인적사항(`name`/`phone`/`gender`/`major_id`)은 `student`를 갱신하므로 다른 차수 화면에도 반영됩니다. 생년월일은 로그인 시에만 받고 여기서 수정하지 않습니다.
+성공 시 GET과 같은 본문을 반환합니다. 성별·학과(`gender`/`major_id`)는 `student`를 갱신하므로 다른 차수 화면에도 반영됩니다. 이름·전화번호·생년월일은 로그인 시에만 받고 여기서 수정하지 않습니다.
 
 `DELETE /api/surveys`는 현재 차수 `registration`만 삭제합니다. 남은 접수가 없으면 `student`도 삭제합니다. consent는 유지됩니다.
 

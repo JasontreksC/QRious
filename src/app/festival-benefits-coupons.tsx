@@ -18,9 +18,9 @@ const COUPONS = [
     id: 'menu',
     label: 'COUPON 2',
     booth: '컴소과 저녁 주점 부스',
-    benefit: '김치전 + 감자전 무료 제공',
-    image: '/images/service_menu.png',
-    imageAlt: '김치전과 감자전',
+    benefit: '사이드 메뉴 1개 무료',
+    image: '/images/service_menu_new.png',
+    imageAlt: '사이드 메뉴 예시',
   },
 ] as const;
 
@@ -35,14 +35,14 @@ export function FestivalBenefitsCoupons({
         <span />
       </div>
       <header className={styles.benefitsBookHeader}>
-        <p className={styles.benefitsBookKicker}>COMSO FESTIVAL BENEFITS</p>
+        <p className={styles.benefitsBookKicker}>FESTIVAL BENEFITS</p>
         <h2 id="couple-benefits-title" className={styles.benefitsBookTitle}>
           매칭된 커플 혜택!
         </h2>
         <p className={styles.benefitsBookLead}>
           {matched
-            ? '두 분이 함께 매칭 결과 화면을 보여 주세요.'
-            : '매칭이 성사된 커플에게 제공되는 혜택이에요.'}
+            ? '두 분이 함께 이 화면을 보여 주세요.'
+            : '매칭된 사람과 컴소과 부스로 오면 혜택을 드려요!'}
         </p>
       </header>
 
@@ -61,7 +61,7 @@ export function FestivalBenefitsCoupons({
                 src={coupon.image}
                 alt={coupon.imageAlt}
                 fill
-                sizes="(max-width: 480px) 34vw, 150px"
+                sizes="(max-width: 480px) 42vw, 180px"
               />
             </div>
             <div className={styles.benefitCouponContent}>

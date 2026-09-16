@@ -48,8 +48,6 @@ const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 type SurveyBody = {
-  name?: unknown;
-  phone?: unknown;
   gender?: unknown;
   major?: unknown;
   major_id?: unknown;
@@ -138,10 +136,10 @@ export async function POST(req: NextRequest) {
   }
 
   const registrationId = randomUUID();
-  const name = parseSubmittedName(body.name) ?? parseSubmittedName(session.name);
+  const name = parseSubmittedName(session.name);
   const majorId =
     asTrimmedString(body.major_id) ?? asTrimmedString(body.major);
-  const phoneRaw = asTrimmedString(body.phone) ?? session.phone;
+  const phoneRaw = session.phone;
   const mbti = asTrimmedString(body.mbti)?.toUpperCase() ?? null;
   const haveCharmIds = asCharmIds(body.have_charm_ids);
   const wantCharmIds = asCharmIds(body.want_charm_ids);
@@ -477,8 +475,6 @@ export async function PATCH(req: NextRequest) {
     Object.prototype.hasOwnProperty.call(body, key);
 
   if (
-    !has('name') &&
-    !has('phone') &&
     !has('gender') &&
     !has('major') &&
     !has('major_id') &&
@@ -512,35 +508,6 @@ export async function PATCH(req: NextRequest) {
     }
 
     const queries = [];
-
-    if (has('name')) {
-      const name = parseSubmittedName(body.name);
-      if (!name) {
-        return jsonError(
-          400,
-          'VALIDATION_ERROR',
-          '이름을 올바르게 입력해 주세요.'
-        );
-      }
-      queries.push(sql`
-        UPDATE student SET name = ${name} WHERE student_id = ${studentId}
-      `);
-    }
-
-    if (has('phone')) {
-      const phoneRaw = asTrimmedString(body.phone);
-      if (!phoneRaw || !isValidKrPhone(phoneRaw)) {
-        return jsonError(
-          400,
-          'VALIDATION_ERROR',
-          '전화번호를 올바르게 입력해 주세요.'
-        );
-      }
-      const phone = formatKrPhone(phoneRaw);
-      queries.push(sql`
-        UPDATE student SET phone = ${phone} WHERE student_id = ${studentId}
-      `);
-    }
 
     if (has('gender')) {
       if (typeof body.gender !== 'boolean') {
@@ -696,30 +663,11 @@ export async function PATCH(req: NextRequest) {
       await sql.transaction(queries);
     }
 
-    const nextName = has('name')
-      ? parseSubmittedName(body.name) ?? session.name
-      : session.name;
-    const nextPhone = has('phone')
-      ? formatKrPhone(String(body.phone ?? session.phone))
-      : session.phone;
-    const survey = await loadOwnSurvey(
-      sql,
-      { name: nextName, phone: nextPhone },
-      round
-    );
+    const survey = await loadOwnSurvey(sql, session, round);
     if (!survey) {
       return jsonError(404, 'NOT_FOUND', '접수 내역이 없습니다.');
     }
-    const res = NextResponse.json(survey);
-    if (has('name') || has('phone')) {
-      const token = encodeSession({
-        name: survey.name,
-        phone: survey.phone,
-        birth: session.birth,
-      });
-      if (token) res.cookies.set(SESSION_COOKIE, token, sessionCookieOptions());
-    }
-    return res;
+    return NextResponse.json(survey);
   } catch (err) {
     console.error('PATCH /api/surveys', err);
     const message =

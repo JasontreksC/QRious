@@ -12,7 +12,6 @@ import {
 } from '@/lib/api';
 import { AGE_PREF_ANY, AGE_PREF_SPECIFIC } from '@/lib/age-pref';
 import { formatBirth } from '@/lib/birth';
-import { STUDENT_NAME_MAX, STUDENT_NAME_MIN } from '@/lib/student-name';
 
 const MBTI_AXES = [
   { key: 'ei', left: 'E', right: 'I', leftHint: '외향', rightHint: '내향' },
@@ -22,9 +21,7 @@ const MBTI_AXES = [
 ] as const;
 
 type FieldKey =
-  | 'name'
   | 'major'
-  | 'phone'
   | 'gender'
   | 'agePref'
   | 'mbti'
@@ -34,9 +31,7 @@ type FieldKey =
   | 'exWant';
 
 type Draft = {
-  name: string;
   major_id: string;
-  phone: string;
   gender: boolean;
   agePrefAny: boolean;
   agePrefIds: string[];
@@ -47,18 +42,9 @@ type Draft = {
   exWant: string;
 };
 
-function formatKrPhone(digits: string): string {
-  const d = digits.replace(/\D/g, '').slice(0, 11);
-  if (d.length <= 3) return d;
-  if (d.length <= 7) return `${d.slice(0, 3)}-${d.slice(3)}`;
-  return `${d.slice(0, 3)}-${d.slice(3, 7)}-${d.slice(7)}`;
-}
-
 function toDraft(survey: OwnSurvey): Draft {
   return {
-    name: survey.name,
     major_id: survey.major_id,
-    phone: survey.phone,
     gender: survey.gender,
     agePrefAny: survey.age_pref_ids.includes(AGE_PREF_ANY),
     agePrefIds: survey.age_pref_ids.filter((id) => id !== AGE_PREF_ANY),
@@ -104,6 +90,7 @@ export function SubmittedSurvey({
   const [draft, setDraft] = useState<Draft | null>(null);
   const [saving, setSaving] = useState(false);
   const [fieldError, setFieldError] = useState('');
+  const [open, setOpen] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -124,6 +111,17 @@ export function SubmittedSurvey({
     void load();
   }, []);
 
+  const toggleOpen = () => {
+    setOpen((prev) => {
+      if (prev) {
+        setEditing(null);
+        setDraft(null);
+        setFieldError('');
+      }
+      return !prev;
+    });
+  };
+
   const startEdit = (field: FieldKey) => {
     if (!survey) return;
     setEditing(field);
@@ -141,29 +139,12 @@ export function SubmittedSurvey({
     if (!survey || !draft || !editing) return;
 
     let payload: SurveyPatch | null = null;
-    if (editing === 'name') {
-      const name = draft.name.trim();
-      if (!name) {
-        setFieldError('이름을 입력해 주세요.');
-        return;
-      }
-      if (name.length < STUDENT_NAME_MIN) {
-        setFieldError('이름은 2글자 이상이어야 합니다.');
-        return;
-      }
-      if (name.length > STUDENT_NAME_MAX) {
-        setFieldError('이름은 20글자 이하여야 합니다.');
-        return;
-      }
-      payload = { name };
-    } else if (editing === 'major') {
+    if (editing === 'major') {
       if (!draft.major_id) {
         setFieldError('학과를 선택해 주세요.');
         return;
       }
       payload = { major_id: draft.major_id };
-    } else if (editing === 'phone') {
-      payload = { phone: draft.phone };
     } else if (editing === 'gender') {
       payload = { gender: draft.gender };
     } else if (editing === 'agePref') {
@@ -220,27 +201,6 @@ export function SubmittedSurvey({
     }
   };
 
-  if (loading) {
-    return (
-      <div className="mt-6 h-40 rounded-xl bg-[#FDE8EC] animate-pulse" />
-    );
-  }
-
-  if (loadError || !survey) {
-    return (
-      <div className="mt-6 rounded-xl border border-[#F0D9DF] bg-[#FDE8EC] px-4 py-4 text-sm text-[#8C7A8E]">
-        <p>{loadError || '접수 정보를 불러오지 못했습니다.'}</p>
-        <button
-          type="button"
-          onClick={() => void load()}
-          className="mt-2 text-[#E8526A] font-semibold underline"
-        >
-          다시 시도
-        </button>
-      </div>
-    );
-  }
-
   const row = (
     field: FieldKey,
     label: string,
@@ -292,6 +252,39 @@ export function SubmittedSurvey({
 
   return (
     <div className="mt-6 pt-5 border-t border-dashed border-[#F0D9DF] text-left">
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls="submitted-survey-panel"
+        onClick={toggleOpen}
+        className="w-full min-h-[48px] flex items-center justify-center gap-2 rounded-xl border border-[#F0D9DF] bg-[#FDE8EC] px-4 py-3 text-[15px] font-semibold text-[#E8526A] transition-all duration-200 hover:border-[#E8526A]"
+      >
+        {open ? '접수 정보 접기' : '접수 정보 확인'}
+        <span aria-hidden="true" className="text-xs">
+          {open ? '▲' : '▼'}
+        </span>
+      </button>
+
+      {open ? (
+        <div
+          id="submitted-survey-panel"
+          className="mt-4"
+        >
+          {loading ? (
+            <div className="h-40 rounded-xl bg-[#FDE8EC] animate-pulse" />
+          ) : loadError || !survey ? (
+            <div className="rounded-xl border border-[#F0D9DF] bg-[#FDE8EC] px-4 py-4 text-sm text-[#8C7A8E]">
+              <p>{loadError || '접수 정보를 불러오지 못했습니다.'}</p>
+              <button
+                type="button"
+                onClick={() => void load()}
+                className="mt-2 text-[#E8526A] font-semibold underline"
+              >
+                다시 시도
+              </button>
+            </div>
+          ) : (
+            <>
       <h3 className="text-sm font-bold text-[#2B1B2E] mb-1">
         {survey.round ? `${survey.round}차 ` : ''}내 접수 정보
       </h3>
@@ -299,23 +292,14 @@ export function SubmittedSurvey({
         {editable ? '마감 전까지 수정할 수 있어요.' : '접수가 마감되어 수정할 수 없어요.'}
       </p>
 
-      {row(
-        'name',
-        '이름',
-        <span className="font-semibold">{survey.name}</span>,
-        <input
-          type="text"
-          maxLength={STUDENT_NAME_MAX}
-          autoComplete="name"
-          value={draft?.name ?? ''}
-          onChange={(e) =>
-            setDraft((prev) =>
-              prev ? { ...prev, name: e.target.value } : prev
-            )
-          }
-          className="w-full px-3 py-2 border border-[#F0D9DF] rounded-xl bg-[#FDE8EC] text-[15px] outline-none focus:border-[#E8526A] focus:bg-white"
-        />
-      )}
+      <div className="py-3 border-b border-[#F0D9DF]/80 text-left">
+        <p className="text-[11px] font-semibold tracking-wide text-[#8C7A8E] uppercase shrink-0 pt-0.5">
+          이름
+        </p>
+        <div className="mt-1.5 text-sm text-[#2B1B2E] leading-relaxed">
+          <span className="font-semibold">{survey.name}</span>
+        </div>
+      </div>
 
       {row(
         'major',
@@ -338,23 +322,14 @@ export function SubmittedSurvey({
         </select>
       )}
 
-      {row(
-        'phone',
-        '전화번호',
-        survey.phone,
-        <input
-          type="tel"
-          inputMode="numeric"
-          maxLength={13}
-          value={draft?.phone ?? ''}
-          onChange={(e) =>
-            setDraft((prev) =>
-              prev ? { ...prev, phone: formatKrPhone(e.target.value) } : prev
-            )
-          }
-          className="w-full px-3 py-2 border border-[#F0D9DF] rounded-xl bg-[#FDE8EC] text-[15px] outline-none focus:border-[#E8526A] focus:bg-white"
-        />
-      )}
+      <div className="py-3 border-b border-[#F0D9DF]/80 text-left">
+        <p className="text-[11px] font-semibold tracking-wide text-[#8C7A8E] uppercase shrink-0 pt-0.5">
+          전화번호
+        </p>
+        <div className="mt-1.5 text-sm text-[#2B1B2E] leading-relaxed">
+          {survey.phone}
+        </div>
+      </div>
 
       {row(
         'gender',
@@ -616,6 +591,10 @@ export function SubmittedSurvey({
           className="w-full px-3 py-2 border border-[#F0D9DF] rounded-xl bg-[#FDE8EC] text-[15px] outline-none focus:border-[#E8526A] focus:bg-white resize-none"
         />
       )}
+            </>
+          )}
+        </div>
+      ) : null}
     </div>
   );
 }

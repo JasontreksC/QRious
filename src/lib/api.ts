@@ -70,8 +70,6 @@ export type SurveyStats = {
 };
 
 export type SurveyPayload = {
-  name: string;
-  phone: string;
   gender: boolean;
   major_id: string;
   mbti: string;
@@ -124,8 +122,6 @@ export type MatchPartner = {
 };
 
 export type SurveyPatch = {
-  name?: string;
-  phone?: string;
   gender?: boolean;
   major_id?: string;
   mbti?: string;

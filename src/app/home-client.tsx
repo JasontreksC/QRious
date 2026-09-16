@@ -42,7 +42,7 @@ import {
   AGE_PREF_SPECIFIC,
   type AgePrefSpecificId,
 } from '@/lib/age-pref';
-import { birthDigits, isValidBirth } from '@/lib/birth';
+import { birthDigits, formatBirth, isValidBirth } from '@/lib/birth';
 import {
   STUDENT_NAME_MAX,
   STUDENT_NAME_MIN,
@@ -54,7 +54,7 @@ import { SiteHeader } from './site-header';
 import { SubmittedSurvey } from './submitted-survey';
 import { FestivalBenefitsCoupons } from './festival-benefits-coupons';
 import { useEventTimes } from './event-times-context';
-import { formatKstMonthDayTime, getHeroTitlePlaques, getParticipantHomeView, isAwaitingAnnouncement, isRound1ResultAndRound2Open, isSurveyOpen, shouldShowLogin, roundLabel } from '@/lib/deadline';
+import { getHeroTitlePlaques, getParticipantHomeView, isAwaitingAnnouncement, isRound1ResultAndRound2Open, isSurveyOpen, shouldShowLogin, roundLabel } from '@/lib/deadline';
 import qriousLogo from './icon.png';
 import styles from './y2k-theme.module.css';
 
@@ -216,9 +216,7 @@ type AgePrefForm = {
 };
 
 type FormData = {
-  name: string;
   major: string;
-  phone: string;
   gender: boolean | null;
   agePref: AgePrefForm;
   mbti: string;
@@ -230,9 +228,7 @@ type FormData = {
 };
 
 type FieldKey =
-  | 'name'
   | 'major'
-  | 'phone'
   | 'gender'
   | 'agePref'
   | 'mbti'
@@ -241,9 +237,7 @@ type FieldKey =
   | 'consent';
 
 const initialFormData: FormData = {
-  name: '',
   major: '',
-  phone: '',
   gender: null,
   agePref: { any: false, ids: [] },
   mbti: 'ENTJ',
@@ -279,9 +273,7 @@ export default function Home({
   const [mbtiAxes, setMbtiAxes] = useState<MbtiAxes>(initialMbtiAxes);
 
   const [touched, setTouched] = useState<Record<FieldKey, boolean>>({
-    name: false,
     major: false,
-    phone: false,
     gender: false,
     agePref: false,
     mbti: false,
@@ -291,9 +283,7 @@ export default function Home({
   });
 
   const [errors, setErrors] = useState<Record<FieldKey, string>>({
-    name: '',
     major: '',
-    phone: '',
     gender: '',
     agePref: '',
     mbti: '',
@@ -433,11 +423,6 @@ export default function Home({
     setAuthSession(session);
     if (session.authenticated) {
       if (session.submitted) setSubmitted(true);
-      setFormData((prev) => ({
-        ...prev,
-        name: prev.name || session.name,
-        phone: prev.phone || session.phone,
-      }));
     }
     return false;
   };
@@ -476,25 +461,11 @@ export default function Home({
       case 'gender':
         if (value === null || value === undefined) return '성별을 선택해 주세요.';
         return '';
-      case 'name': {
-        const v = typeof value === 'string' ? value.trim() : '';
-        if (!v) return '이름을 입력해 주세요.';
-        if (v.length < STUDENT_NAME_MIN) return '이름은 2글자 이상이어야 합니다.';
-        if (v.length > STUDENT_NAME_MAX) return '이름은 20글자 이하여야 합니다.';
-        return '';
-      }
       case 'major': {
         const v = typeof value === 'string' ? value.trim() : '';
         if (!v) return '학과를 선택해 주세요.';
         if (!majors.some((item) => item.major_id === v))
           return '학과를 목록에서 선택해 주세요.';
-        return '';
-      }
-      case 'phone': {
-        const v = typeof value === 'string' ? value.trim() : '';
-        if (!v) return '전화번호를 입력해 주세요.';
-        if (!isValidKrPhone(v))
-          return '휴대폰 번호 형식(010-1234-5678)으로 입력해 주세요.';
         return '';
       }
       case 'agePref': {
@@ -531,11 +502,7 @@ export default function Home({
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
   ) => {
     const { name, value } = e.target;
-    let finalValue = value;
-
-    if (name === 'phone') {
-      finalValue = formatKrPhone(value);
-    }
+    const finalValue = value;
 
     setFormData((prev) => ({ ...prev, [name]: finalValue }));
 
@@ -618,9 +585,7 @@ export default function Home({
 
   const handleSubmit = async () => {
     const fields: FieldKey[] = [
-      'name',
       'major',
-      'phone',
       'gender',
       'agePref',
       'mbti',
@@ -630,9 +595,7 @@ export default function Home({
     ];
 
     setTouched({
-      name: true,
       major: true,
-      phone: true,
       gender: true,
       agePref: true,
       mbti: true,
@@ -642,9 +605,7 @@ export default function Home({
     });
 
     const newErrors = {
-      name: validateField('name', formData.name),
       major: validateField('major', formData.major),
-      phone: validateField('phone', formData.phone),
       gender: validateField('gender', formData.gender),
       agePref: validateField('agePref', formData.agePref),
       mbti: validateField('mbti', formData.mbti),
@@ -678,9 +639,12 @@ export default function Home({
       const exHave = formData.exHave.trim();
       const exWant = formData.exWant.trim();
 
+      if (!authSession?.authenticated) {
+        triggerToast('⚠️ 이름·전화번호·생년월일로 로그인해 주세요.');
+        return;
+      }
+
       await submitSurvey({
-        name: formData.name.trim(),
-        phone: formData.phone.trim(),
         gender: formData.gender as boolean,
         major_id: formData.major,
         age_pref_ids: formData.agePref.any
@@ -772,27 +736,6 @@ export default function Home({
     } finally {
       setCancelling(false);
     }
-  };
-
-  const textInputKeys = ['name', 'phone'] as const;
-
-  const getInputClass = (fieldName: (typeof textInputKeys)[number]) => {
-    const base =
-      'w-full px-4 py-3 border-1.5 border-[#F0D9DF] rounded-xl font-sans text-[16px] text-[#2B1B2E] bg-[#FDE8EC] transition-all duration-200 outline-none placeholder-[#C9B0BE] focus:border-[#E8526A] focus:bg-white focus:ring-3 focus:ring-[#E8526A]/10 appearance-none';
-    if (!touched[fieldName]) return base;
-    return errors[fieldName]
-      ? `${base} border-[#E8526A] bg-[#FEF0F2]`
-      : `${base} border-[#4CAF82] bg-[#F2FBF6]`;
-  };
-
-  const getHintDetails = (fieldName: (typeof textInputKeys)[number]) => {
-    if (!touched[fieldName]) {
-      return { text: '', style: 'text-[#8C7A8E] min-h-[0px] mt-0' };
-    }
-    if (errors[fieldName]) {
-      return { text: errors[fieldName], style: 'text-[#E8526A] min-h-[16px] mt-1' };
-    }
-    return { text: '✓ 확인됐어요', style: 'text-[#4CAF82] font-semibold min-h-[16px] mt-1' };
   };
 
   const charmChipClass = (selected: boolean) =>
@@ -988,6 +931,9 @@ export default function Home({
                     <p className="truncate text-xs text-[#8C7A8E]">
                       {authSession.phone}
                     </p>
+                    <p className="truncate text-xs text-[#8C7A8E]">
+                      {formatBirth(authSession.birth)}
+                    </p>
                   </div>
                 </div>
               )}
@@ -997,23 +943,9 @@ export default function Home({
               </h2>
               <p className="text-[15px] text-[#8C7A8E] mt-2 leading-relaxed">
                 이미 {displayRound ? `${roundLabel(displayRound)} ` : ''}접수가 완료된 상태예요.
-                <br />곧 좋은 인연을 연결해 드릴게요.
+                <br />
+                매칭 결과 발표 일시에 문자로 알림을 발송드릴 예정이에요.
               </p>
-              <div className="mt-4 rounded-xl border border-[#F0D9DF] bg-[#FDE8EC] px-4 py-3.5">
-                <p className="text-[15px] font-bold text-[#E8526A] leading-relaxed">
-                  {displayRound === 2
-                    ? `2차 매칭 발표는 ${formatKstMonthDayTime(times.round2Announce)}예요.`
-                    : `1차 매칭 발표는 ${formatKstMonthDayTime(times.round1Announce)}예요.`}
-                  <br /><br />
-                  매칭 결과 발표 일시에 문자로 알림을 발송드릴 예정이에요.
-                  <br />
-                  문자로 받은 링크를 열거나, 이 사이트에 다시 로그인하면 결과 화면이 나와요. 거기서 매칭된 상대를 알 수 있어요.
-                  <br /><br />
-                  경우에 따라 매칭이 안될수도 있어요..ㅜㅜ
-                  <br />
-                  그러면 너무 아쉽겠지만, 더 좋은 기회가 찾아올거에요!
-                </p>
-              </div>
               <SubmittedSurvey
                 majors={majors}
                 charms={charms}
@@ -1049,48 +981,13 @@ export default function Home({
                   <p className="truncate text-xs text-[#8C7A8E]">
                     {authSession.phone}
                   </p>
+                  <p className="truncate text-xs text-[#8C7A8E]">
+                    {formatBirth(authSession.birth)}
+                  </p>
                 </div>
               </div>
             )}
             <form onSubmit={(e) => e.preventDefault()} noValidate className="space-y-5">
-              {/* Name */}
-              <div className="flex flex-col gap-1">
-                <label
-                  htmlFor="name"
-                  className="text-xs font-semibold text-[#8C7A8E] tracking-wider uppercase"
-                >
-                  🪪 이름<span className="text-[#E8526A]">*</span>
-                </label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    id="name"
-                    name="name"
-                    placeholder="실명을 입력해 주세요"
-                    maxLength={STUDENT_NAME_MAX}
-                    autoComplete="name"
-                    value={formData.name}
-                    onChange={handleChange}
-                    onBlur={handleBlur}
-                    className={`${getInputClass('name')} pr-12`}
-                  />
-                  {touched.name && (
-                    <span
-                      className={`absolute right-4 top-1/2 -translate-y-1/2 font-bold text-lg pointer-events-none transition-all duration-200 ${
-                        errors.name ? 'text-[#E8526A]' : 'text-[#4CAF82]'
-                      }`}
-                    >
-                      {errors.name ? '✕' : '✓'}
-                    </span>
-                  )}
-                </div>
-                <p
-                  className={`text-xs leading-relaxed transition-all duration-150 ${getHintDetails('name').style}`}
-                >
-                  {getHintDetails('name').text}
-                </p>
-              </div>
-
               {/* Major */}
               <div className="flex flex-col gap-1">
                 <label
@@ -1134,50 +1031,6 @@ export default function Home({
                   {touched.major
                     ? errors.major || '✓ 확인됐어요'
                     : ''}
-                </p>
-              </div>
-
-              {/* Phone */}
-              <div className="flex flex-col gap-1">
-                <label
-                  htmlFor="phone"
-                  className="flex flex-wrap items-center gap-y-0.5 text-xs font-semibold text-[#8C7A8E] tracking-wider uppercase"
-                >
-                  <span>
-                    📞 전화번호<span className="text-[#E8526A]">*</span>
-                  </span>
-                  <span className="text-[10px] text-[#8C7A8E] normal-case sm:ml-2 font-normal leading-relaxed">
-                    매칭된 상대에게 전화번호가 전달돼요.
-                  </span>
-                </label>
-                <div className="relative">
-                  <input
-                    type="tel"
-                    id="phone"
-                    name="phone"
-                    placeholder="010-1234-5678"
-                    maxLength={13}
-                    inputMode="numeric"
-                    autoComplete="tel"
-                    value={formData.phone}
-                    onChange={handleChange}
-                    onBlur={handleBlur}
-                    className={`${getInputClass('phone')} pr-12`}
-                  />
-                  {touched.phone && (
-                    <span
-                      className={`absolute right-4 top-1/2 -translate-y-1/2 font-bold text-lg pointer-events-none transition-all duration-200 ${
-                        errors.phone ? 'text-[#E8526A]' : 'text-[#4CAF82]'
-                      }`}
-                    >
-                      {errors.phone ? '✕' : '✓'}
-                    </span>
-                  )}
-                </div>
-                <p
-                  className={`text-xs leading-relaxed transition-all duration-150 ${getHintDetails('phone').style}`}
-                >
-                  {getHintDetails('phone').text}
                 </p>
               </div>
 
