@@ -751,11 +751,11 @@ export default function Home({
       <div className={styles.decorScene} aria-hidden="true">
         <span className={`${styles.orb} ${styles.orbOne}`} />
         <span className={`${styles.orb} ${styles.orbTwo}`} />
-        <span className={`${styles.sticker} ${styles.onlineSticker}`}>
-          ● ONLINE
+        <span className={`${styles.sticker} ${styles.titleSticker1}`}>
+          태그로 고르는<br />매력 ・ 이상형
         </span>
-        <span className={`${styles.sticker} ${styles.messageSticker}`}>
-          NEW MESSAGE!
+        <span className={`${styles.sticker} ${styles.titleSticker2}`}>
+          GPT 5.6<br />AI 매칭 시스템
         </span>
         <span className={styles.chromeStar}>✦</span>
       </div>
@@ -781,7 +781,7 @@ export default function Home({
         <div className={`${styles.hero} text-center mb-8`}>
           <p className={styles.eyebrow}>
             <span className={styles.statusDot} aria-hidden="true" />
-            YEONSUNG FESTIVAL · 2026
+            양지대동제 · 2026
           </p>
           <div className={styles.logoStage}>
             <span
@@ -807,7 +807,7 @@ export default function Home({
               ★
             </span>
             <span className={styles.logoStatus} aria-hidden="true">
-              YOU&apos;VE GOT LOVE!
+              YOUR DESTINY IS HERE!
             </span>
           </div>
           <h1
@@ -822,7 +822,7 @@ export default function Home({
             </span>
           </h1>
           <p className={styles.heroCopy}>
-            새로운 인연에 접속 중...{' '}
+            컴소과가 말아주는 캠퍼스 소개팅{' '}
             <span className={styles.heroHeart} aria-hidden="true">
               ♡
             </span>

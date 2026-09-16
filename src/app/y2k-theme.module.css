@@ -222,23 +222,24 @@
   font-size: 9px;
   font-weight: 800;
   letter-spacing: 0.08em;
-  line-height: 1;
+  line-height: 1.2;
+  text-align: center;
   white-space: nowrap;
 }
 
-.onlineSticker {
+.titleSticker1 {
   top: 168px;
   left: 20px;
   padding: 8px 10px;
-  color: var(--y2k-ink);
-  background: var(--y2k-lime);
+  color: var(--y2k-sky-soft);
+  background: var(--y2k-pink);
   box-shadow: 4px 4px 0 var(--y2k-pink);
   transform: rotate(-8deg);
   animation: stickerFloat 4.8s ease-in-out infinite;
 }
 
-.messageSticker {
-  top: 374px;
+.titleSticker2 {
+  top: 260px;
   right: 15px;
   padding: 8px 10px;
   color: white;
@@ -561,7 +562,8 @@
 }
 
 .pixelHeartRight {
-  right: -34px;
+  /* top: 90px; */
+  right: -50px;
   rotate: 7deg;
   animation-delay: -1.6s;
 }
@@ -790,17 +792,17 @@
 }
 
 @media (max-width: 520px) {
-  .onlineSticker {
-    left: -22px;
+  /* .onlineSticker {
+    left: 0px;
     opacity: 0.75;
     scale: 0.88;
-  }
+  } */
 
-  .messageSticker {
+  /* .messageSticker {
     right: -32px;
     opacity: 0.72;
     scale: 0.86;
-  }
+  } */
 
   .chromeStar {
     left: -7px;
