@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import {
   cancelSurvey,
@@ -56,11 +55,7 @@ import { FestivalBenefitsCoupons } from './festival-benefits-coupons';
 import { useEventTimes } from './event-times-context';
 import { getHeroTitlePlaques, getParticipantHomeView, isAwaitingAnnouncement, isRound1ResultAndRound2Open, isSurveyOpen, shouldShowLogin, roundLabel } from '@/lib/deadline';
 import styles from './y2k-theme.module.css';
-
-const HeroCrtComputer = dynamic(() => import('./hero-crt-computer'), {
-  ssr: false,
-  loading: () => <div className={styles.crtCanvas} aria-hidden />,
-});
+import HeroCrtComputer from './hero-crt-computer';
 
 const MBTI_OPTIONS = [
   'ISTJ', 'ISFJ', 'INFJ', 'INTJ',
