@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import Image from 'next/image';
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import {
   cancelSurvey,
@@ -55,8 +55,12 @@ import { SubmittedSurvey } from './submitted-survey';
 import { FestivalBenefitsCoupons } from './festival-benefits-coupons';
 import { useEventTimes } from './event-times-context';
 import { getHeroTitlePlaques, getParticipantHomeView, isAwaitingAnnouncement, isRound1ResultAndRound2Open, isSurveyOpen, shouldShowLogin, roundLabel } from '@/lib/deadline';
-import qriousLogo from './icon.png';
 import styles from './y2k-theme.module.css';
+
+const HeroCrtComputer = dynamic(() => import('./hero-crt-computer'), {
+  ssr: false,
+  loading: () => <div className={styles.crtCanvas} aria-hidden />,
+});
 
 const MBTI_OPTIONS = [
   'ISTJ', 'ISFJ', 'INFJ', 'INTJ',
@@ -258,6 +262,29 @@ function HeroTitlePlaque({ label }: { label: string }) {
         ★
       </span>
     </span>
+  );
+}
+
+function HeroHeartMonitor() {
+  return (
+    <div className={styles.logoStage}>
+      <span
+        className={`${styles.logoSparkle} ${styles.logoSparkleOne}`}
+        aria-hidden="true"
+      >
+        ✦
+      </span>
+      <HeroCrtComputer />
+      <span
+        className={`${styles.logoSparkle} ${styles.logoSparkleTwo}`}
+        aria-hidden="true"
+      >
+        ★
+      </span>
+      <span className={styles.logoStatus} aria-hidden="true">
+        YOUR DESTINY IS HERE!
+      </span>
+    </div>
   );
 }
 
@@ -783,33 +810,7 @@ export default function Home({
             <span className={styles.statusDot} aria-hidden="true" />
             양지대동제 · 2026
           </p>
-          <div className={styles.logoStage}>
-            <span
-              className={`${styles.logoSparkle} ${styles.logoSparkleOne}`}
-              aria-hidden="true"
-            >
-              ✦
-            </span>
-            <div className={styles.logoFrame}>
-              <div className={styles.logoInset}>
-                <Image
-                  src={qriousLogo}
-                  alt="QRious"
-                  priority
-                  className={styles.logoImage}
-                />
-              </div>
-            </div>
-            <span
-              className={`${styles.logoSparkle} ${styles.logoSparkleTwo}`}
-              aria-hidden="true"
-            >
-              ★
-            </span>
-            <span className={styles.logoStatus} aria-hidden="true">
-              YOUR DESTINY IS HERE!
-            </span>
-          </div>
+          <HeroHeartMonitor />
           <h1
             className={styles.heroTitle}
             aria-label={heroPlaques.join(', ')}

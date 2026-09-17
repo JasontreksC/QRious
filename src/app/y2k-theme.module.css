@@ -311,83 +311,28 @@
 
 .logoStage {
   position: relative;
-  width: 196px;
-  height: 180px;
-  margin: 0 auto 4px;
+  width: min(100%, 340px);
+  height: 520px;
+  margin: 0 auto 2px;
 }
 
-.logoFrame {
-  position: absolute;
-  top: 1px;
-  left: 50%;
-  width: 156px;
-  height: 156px;
-  padding: 7px;
-  border: 2px solid white;
-  border-radius: 38px;
-  background: conic-gradient(
-    from 35deg,
-    #fff,
-    #50b0d1,
-    #b5dc10,
-    #fff,
-    #ef238e,
-    #e8f6fa,
-    #b5dc10,
-    #fff,
-    #50b0d1
-  );
-  box-shadow:
-    7px 8px 0 rgb(45 52 55 / 16%),
-    0 0 30px rgb(239 35 142 / 20%);
-  transform: translateX(-50%) rotate(-2deg);
-}
-
-.logoFrame::after {
-  position: absolute;
-  top: 8px;
-  right: 16px;
-  width: 48px;
-  height: 18px;
-  border-radius: 999px;
-  background: linear-gradient(105deg, transparent, rgb(255 255 255 / 88%), transparent);
-  content: "";
-  transform: rotate(28deg);
-  pointer-events: none;
-}
-
-.logoInset {
+.crtCanvas {
   position: relative;
-  display: grid;
+  z-index: 1;
   width: 100%;
   height: 100%;
-  place-items: center;
-  overflow: hidden;
-  border: 2px solid rgb(67 38 82 / 22%);
-  border-radius: 30px;
-  background: white;
 }
 
-.logoInset::after {
-  position: absolute;
-  inset: 0;
-  background: var(--y2k-pink);
-  content: "";
-  mix-blend-mode: color;
-  pointer-events: none;
-}
-
-.logoImage {
+.crtCanvas :global(canvas) {
   display: block;
   width: 100%;
   height: 100%;
-  object-fit: cover;
 }
 
 .logoStatus {
   position: absolute;
-  z-index: 2;
-  bottom: 4px;
+  z-index: 5;
+  bottom: 10px;
   left: 50%;
   padding: 7px 11px 6px;
   border: 2px solid white;
@@ -416,15 +361,15 @@
 }
 
 .logoSparkleOne {
-  top: 8px;
-  right: 4px;
+  top: 2px;
+  right: 2px;
   font-size: 34px;
   transform: rotate(14deg);
 }
 
 .logoSparkleTwo {
-  bottom: 31px;
-  left: 5px;
+  bottom: 28px;
+  left: 2px;
   color: var(--y2k-lime);
   font-size: 25px;
   animation-delay: 0.8s;
@@ -1462,7 +1407,8 @@
   .chromeStar,
   .logoSparkle,
   .pixelHeart,
-  .pixelHeartDot {
+  .pixelHeartDot,
+  .monitorLed {
     animation: none;
   }
 }
