@@ -60,6 +60,13 @@ function createScreenDrawer(canvas: HTMLCanvasElement) {
   }
 
   const heartSprite = createHeartSprite();
+  const noiseTile = document.createElement('canvas');
+  noiseTile.width = 48;
+  noiseTile.height = 48;
+  const noiseCtx = noiseTile.getContext('2d');
+  if (!noiseCtx) {
+    throw new Error('2D canvas is unavailable');
+  }
   const reducedMotion = prefersReducedMotion();
   let time = 0;
   let brightness = 1;
@@ -72,22 +79,42 @@ function createScreenDrawer(canvas: HTMLCanvasElement) {
     if (flickerHold > 0) return;
 
     const roll = Math.random();
-    if (roll < 0.14) {
-      brightness = 0.22 + Math.random() * 0.28;
+    if (roll < 0.18) {
+      brightness = 0.16 + Math.random() * 0.28;
       flickerHold = 0.04 + Math.random() * 0.08;
-    } else if (roll < 0.2) {
-      brightness = 0.08 + Math.random() * 0.12;
+    } else if (roll < 0.28) {
+      brightness = 0.06 + Math.random() * 0.1;
       flickerHold = 0.03 + Math.random() * 0.05;
-    } else if (roll < 0.32) {
+    } else if (roll < 0.4) {
       brightness = 1;
       flickerHold = 0.05 + Math.random() * 0.08;
     } else {
-      brightness = 0.7 + Math.random() * 0.3;
-      flickerHold = 0.07 + Math.random() * 0.2;
+      brightness = 0.62 + Math.random() * 0.38;
+      flickerHold = 0.05 + Math.random() * 0.14;
     }
   };
 
-    const draw = (animated: boolean) => {
+  const drawNoise = (width: number, height: number) => {
+    const pixels = noiseCtx.createImageData(48, 48);
+    const data = pixels.data;
+    for (let i = 0; i < data.length; i += 4) {
+      const value = Math.random() * 255;
+      data[i] = value;
+      data[i + 1] = value * 0.82;
+      data[i + 2] = value * 0.9;
+      data[i + 3] = 255;
+    }
+    noiseCtx.putImageData(pixels, 0, 0);
+
+    ctx.save();
+    ctx.globalAlpha = 0.28 * Math.max(0.35, brightness);
+    ctx.imageSmoothingEnabled = false;
+    ctx.globalCompositeOperation = 'overlay';
+    ctx.drawImage(noiseTile, 0, 0, width, height);
+    ctx.restore();
+  };
+
+  const draw = (animated: boolean) => {
     const { width, height } = canvas;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, width, height);
@@ -110,22 +137,26 @@ function createScreenDrawer(canvas: HTMLCanvasElement) {
       ctx.restore();
     }
 
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.22)';
-    for (let y = 0; y < height; y += 3) {
-      ctx.fillRect(0, y, width, 1);
+    if (live) {
+      drawNoise(width, height);
+    }
+
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.42)';
+    for (let y = 0; y < height; y += 5) {
+      ctx.fillRect(0, y, width, 2);
     }
 
     if (live && animated) {
-      const roll = (time * 0.18) % 1;
+      const roll = (time * 0.22) % 1;
       const veins = [
-        { offset: 0, height: 10, glow: 0.14 },
-        { offset: 0.38, height: 4, glow: 0.22 },
-        { offset: 0.73, height: 7, glow: 0.1 },
+        { offset: 0, height: 18, glow: 0.26 },
+        { offset: 0.38, height: 8, glow: 0.38 },
+        { offset: 0.73, height: 13, glow: 0.2 },
       ];
       for (const vein of veins) {
         const t = (roll + vein.offset) % 1;
         const y = t * (height - vein.height);
-        const shift = Math.round(Math.sin(time * 6 + vein.offset * 8) * 5);
+        const shift = Math.round(Math.sin(time * 6 + vein.offset * 8) * 9);
         ctx.drawImage(
           canvas,
           0,
@@ -138,7 +169,7 @@ function createScreenDrawer(canvas: HTMLCanvasElement) {
           vein.height
         );
         ctx.fillStyle = `rgba(255, 214, 236, ${vein.glow})`;
-        ctx.fillRect(0, y, width, Math.max(1, Math.round(vein.height * 0.28)));
+        ctx.fillRect(0, y, width, Math.max(2, Math.round(vein.height * 0.34)));
       }
     }
   };
