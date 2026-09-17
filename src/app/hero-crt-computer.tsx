@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
 import styles from './y2k-theme.module.css';
 
@@ -51,6 +51,8 @@ function prefersReducedMotion() {
   );
 }
 
+const HEART_SIZE = { width: 92, height: 107 };
+
 function createScreenDrawer(canvas: HTMLCanvasElement) {
   const ctx = canvas.getContext('2d');
   if (!ctx) {
@@ -85,7 +87,7 @@ function createScreenDrawer(canvas: HTMLCanvasElement) {
     }
   };
 
-  const draw = (animated: boolean) => {
+    const draw = (animated: boolean) => {
     const { width, height } = canvas;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.clearRect(0, 0, width, height);
@@ -93,16 +95,17 @@ function createScreenDrawer(canvas: HTMLCanvasElement) {
     ctx.fillRect(0, 0, width, height);
 
     if (live) {
-      const heart = Math.min(width, height) * 0.92;
+      const heartW = width * (HEART_SIZE.width / 100);
+      const heartH = height * (HEART_SIZE.height / 100);
       ctx.save();
       ctx.globalAlpha = brightness * boot;
       ctx.imageSmoothingEnabled = false;
       ctx.drawImage(
         heartSprite,
-        (width - heart) / 2,
-        (height - heart) / 2 - height * 0.06,
-        heart,
-        heart
+        (width - heartW) / 2,
+        (height - heartH) / 2 - height * 0.06,
+        heartW,
+        heartH
       );
       ctx.restore();
     }
@@ -179,10 +182,95 @@ function createScreenDrawer(canvas: HTMLCanvasElement) {
   };
 }
 
+type Point = { x: number; y: number };
+
+type ScreenCorners = {
+  tl: Point;
+  tr: Point;
+  br: Point;
+  bl: Point;
+};
+
+const SCREEN_CORNERS: ScreenCorners = {
+  tl: { x: 26.21, y: 40.19 },
+  tr: { x: 60.96, y: 42.71 },
+  br: { x: 59.9, y: 67.43 },
+  bl: { x: 27.46, y: 63.22 },
+};
+
+function adj3(m: number[]) {
+  return [
+    m[4] * m[8] - m[5] * m[7],
+    m[2] * m[7] - m[1] * m[8],
+    m[1] * m[5] - m[2] * m[4],
+    m[5] * m[6] - m[3] * m[8],
+    m[0] * m[8] - m[2] * m[6],
+    m[2] * m[3] - m[0] * m[5],
+    m[3] * m[7] - m[4] * m[6],
+    m[1] * m[6] - m[0] * m[7],
+    m[0] * m[4] - m[1] * m[3],
+  ];
+}
+
+function mul3(a: number[], b: number[]) {
+  const result = Array.from({ length: 9 }, () => 0);
+  for (let i = 0; i < 3; i += 1) {
+    for (let j = 0; j < 3; j += 1) {
+      result[i * 3 + j] =
+        a[i * 3] * b[j] + a[i * 3 + 1] * b[3 + j] + a[i * 3 + 2] * b[6 + j];
+    }
+  }
+  return result;
+}
+
+function mul3v(m: number[], v: number[]) {
+  return [
+    m[0] * v[0] + m[1] * v[1] + m[2] * v[2],
+    m[3] * v[0] + m[4] * v[1] + m[5] * v[2],
+    m[6] * v[0] + m[7] * v[1] + m[8] * v[2],
+  ];
+}
+
+function basisToPoints(p1: Point, p2: Point, p3: Point, p4: Point) {
+  const m = [p1.x, p2.x, p3.x, p1.y, p2.y, p3.y, 1, 1, 1];
+  const v = mul3v(adj3(m), [p4.x, p4.y, 1]);
+  return mul3(m, [v[0], 0, 0, 0, v[1], 0, 0, 0, v[2]]);
+}
+
+function matrix3dForQuad(
+  width: number,
+  height: number,
+  corners: ScreenCorners
+) {
+  const src = basisToPoints(
+    { x: 0, y: 0 },
+    { x: width, y: 0 },
+    { x: width, y: height },
+    { x: 0, y: height }
+  );
+  const dst = basisToPoints(corners.tl, corners.tr, corners.br, corners.bl);
+  const h = mul3(dst, adj3(src));
+  const n = h[8] || 1;
+  for (let i = 0; i < 9; i += 1) h[i] /= n;
+  return `matrix3d(${h[0]}, ${h[3]}, 0, ${h[6]}, ${h[1]}, ${h[4]}, 0, ${h[7]}, 0, 0, 1, 0, ${h[2]}, ${h[5]}, 0, ${h[8]})`;
+}
+
 export default function HeroCrtComputer() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const hostRef = useRef<HTMLDivElement>(null);
   const drawerRef = useRef<ReturnType<typeof createScreenDrawer> | null>(null);
   const pendingPower = useRef(false);
+  const [size, setSize] = useState({ width: 340, height: 400 });
+
+  const transform = useMemo(
+    () => matrix3dForQuad(size.width, size.height, {
+      tl: { x: (SCREEN_CORNERS.tl.x / 100) * size.width, y: (SCREEN_CORNERS.tl.y / 100) * size.height },
+      tr: { x: (SCREEN_CORNERS.tr.x / 100) * size.width, y: (SCREEN_CORNERS.tr.y / 100) * size.height },
+      br: { x: (SCREEN_CORNERS.br.x / 100) * size.width, y: (SCREEN_CORNERS.br.y / 100) * size.height },
+      bl: { x: (SCREEN_CORNERS.bl.x / 100) * size.width, y: (SCREEN_CORNERS.bl.y / 100) * size.height },
+    }),
+    [size]
+  );
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -195,8 +283,15 @@ export default function HeroCrtComputer() {
       drawer.powerOn();
     }
 
-    const onResize = () => drawer.resize();
-    const ro = new ResizeObserver(() => drawer.resize());
+    const onResize = () => {
+      drawer.resize();
+      const host = hostRef.current;
+      if (host) {
+        setSize({ width: host.clientWidth, height: host.clientHeight });
+      }
+    };
+    onResize();
+    const ro = new ResizeObserver(onResize);
     ro.observe(canvas);
     window.addEventListener('resize', onResize);
 
@@ -232,6 +327,7 @@ export default function HeroCrtComputer() {
 
   return (
     <div
+      ref={hostRef}
       className={styles.crtCanvas}
       role="img"
       aria-label="레트로 CRT 모니터에 켜진 핑크 하트"
@@ -247,7 +343,12 @@ export default function HeroCrtComputer() {
         className={styles.crtStill}
         onLoad={powerOn}
       />
-      <canvas ref={canvasRef} className={styles.crtScreen} aria-hidden />
+      <canvas
+        ref={canvasRef}
+        className={styles.crtScreen}
+        style={{ transform }}
+        aria-hidden
+      />
     </div>
   );
 }

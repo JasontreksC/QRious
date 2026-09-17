@@ -239,7 +239,7 @@
 }
 
 .titleSticker2 {
-  top: 260px;
+  top: 230px;
   right: 15px;
   padding: 8px 10px;
   color: white;
@@ -317,16 +317,16 @@
 }
 
 .crtCanvas {
-  --crt-screen-left: 25.5%;
-  --crt-screen-top: 41.9%;
-  --crt-screen-width: 35.7%;
-  --crt-screen-height: 23.9%;
-  --crt-perspective: 2000px;
-  --crt-rotate-x: 7deg;
-  --crt-rotate-y: -24.5deg;
-  --crt-rotate-z: 10.5deg;
-  --crt-skew-x: 12deg;
-  --crt-radius: 40% / 40%;
+  --crt-tl-x: 26.21%;
+  --crt-tl-y: 40.19%;
+  --crt-tr-x: 60.96%;
+  --crt-tr-y: 42.71%;
+  --crt-br-x: 59.9%;
+  --crt-br-y: 67.43%;
+  --crt-bl-x: 27.46%;
+  --crt-bl-y: 63.22%;
+  --crt-heart-width: 92%;
+  --crt-heart-height: 107%;
   position: relative;
   z-index: 1;
   width: 100%;
@@ -342,20 +342,12 @@
 
 .crtScreen {
   position: absolute;
-  top: var(--crt-screen-top);
-  left: var(--crt-screen-left);
+  inset: 0;
   display: block;
-  width: var(--crt-screen-width);
-  height: var(--crt-screen-height);
-  overflow: hidden;
-  border-radius: var(--crt-radius);
+  width: 100%;
+  height: 100%;
   pointer-events: none;
-  transform: perspective(var(--crt-perspective))
-    rotateX(var(--crt-rotate-x))
-    rotateY(var(--crt-rotate-y))
-    rotateZ(var(--crt-rotate-z))
-    skewX(var(--crt-skew-x));
-  transform-origin: center center;
+  transform-origin: 0 0;
 }
 
 .logoStatus {
