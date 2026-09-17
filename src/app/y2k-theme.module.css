@@ -312,21 +312,50 @@
 .logoStage {
   position: relative;
   width: min(100%, 340px);
-  height: 520px;
+  height: 400px;
   margin: 0 auto 2px;
 }
 
 .crtCanvas {
+  --crt-screen-left: 25.5%;
+  --crt-screen-top: 41.9%;
+  --crt-screen-width: 35.7%;
+  --crt-screen-height: 23.9%;
+  --crt-perspective: 2000px;
+  --crt-rotate-x: 7deg;
+  --crt-rotate-y: -24.5deg;
+  --crt-rotate-z: 10.5deg;
+  --crt-skew-x: 12deg;
+  --crt-radius: 40% / 40%;
   position: relative;
   z-index: 1;
   width: 100%;
   height: 100%;
 }
 
-.crtCanvas :global(canvas) {
+.crtStill {
+  object-fit: cover;
+  object-position: center;
+  pointer-events: none;
+  user-select: none;
+}
+
+.crtScreen {
+  position: absolute;
+  top: var(--crt-screen-top);
+  left: var(--crt-screen-left);
   display: block;
-  width: 100%;
-  height: 100%;
+  width: var(--crt-screen-width);
+  height: var(--crt-screen-height);
+  overflow: hidden;
+  border-radius: var(--crt-radius);
+  pointer-events: none;
+  transform: perspective(var(--crt-perspective))
+    rotateX(var(--crt-rotate-x))
+    rotateY(var(--crt-rotate-y))
+    rotateZ(var(--crt-rotate-z))
+    skewX(var(--crt-skew-x));
+  transform-origin: center center;
 }
 
 .logoStatus {
