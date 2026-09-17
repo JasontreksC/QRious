@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useLayoutEffect, useMemo, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { ContactShadows } from '@react-three/drei';
 import { GLTFLoader } from 'three-stdlib';
@@ -8,6 +8,26 @@ import * as THREE from 'three';
 import styles from './y2k-theme.module.css';
 
 const MODEL_URL = '/models/crt_computer.glb';
+const DROP_DURATION = 0.95;
+const DROP_HANG = 0.28;
+const POWER_DELAY = 0.16;
+
+function easeOutBounce(t: number) {
+  const n1 = 7.5625;
+  const d1 = 2.75;
+  if (t < 1 / d1) return n1 * t * t;
+  if (t < 2 / d1) {
+    const peak = 0.82;
+    const n2 = (1 - peak) / (0.5 / d1) ** 2;
+    return n2 * (t - 1.5 / d1) ** 2 + peak;
+  }
+  if (t < 2.5 / d1) {
+    const peak = 0.955;
+    const n2 = (1 - peak) / (0.25 / d1) ** 2;
+    return n2 * (t - 2.25 / d1) ** 2 + peak;
+  }
+  return n1 * (t -= 2.65 / d1) * t + 0.984375;
+}
 
 function heartGlyph(size: number): string {
   const s = size;
@@ -86,6 +106,8 @@ function createScreenDrawer() {
   let time = 0;
   let brightness = 1;
   let flickerHold = 0;
+  let live = false;
+  let boot = 0;
 
   const tickFlicker = (delta: number) => {
     flickerHold -= delta;
@@ -120,7 +142,7 @@ function createScreenDrawer() {
 
   const drawHeart = () => {
     ctx.save();
-    ctx.globalAlpha = brightness;
+    ctx.globalAlpha = brightness * boot;
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(
       heartSprite,
@@ -197,7 +219,9 @@ function createScreenDrawer() {
     withScreen(() => {
       ctx.fillStyle = '#070407';
       ctx.fillRect(-screenH / 2, -screenW / 2, screenH, screenW);
-      drawHeart();
+      if (live) {
+        drawHeart();
+      }
 
       ctx.fillStyle = 'rgba(0, 0, 0, 0.22)';
       for (let y = -screenW / 2; y < screenW / 2; y += 3) {
@@ -205,7 +229,7 @@ function createScreenDrawer() {
       }
     });
 
-    if (animated) {
+    if (live && animated) {
       drawRollingVeins(time);
     }
 
@@ -216,10 +240,24 @@ function createScreenDrawer() {
 
   return {
     texture,
+    powerOn() {
+      live = true;
+      boot = 0;
+      brightness = 1;
+      flickerHold = 0.18;
+    },
     advance(delta: number) {
-      if (reducedMotion) return;
+      if (reducedMotion) {
+        if (live && boot < 1) {
+          boot = 1;
+          draw(false);
+        }
+        return;
+      }
+      if (!live) return;
       time += delta;
-      tickFlicker(delta);
+      boot = Math.min(1, boot + delta * 3.4);
+      if (boot > 0.5) tickFlicker(delta);
       draw(true);
     },
   };
@@ -259,32 +297,64 @@ function FrameModel({ object }: { object: THREE.Object3D }) {
   const { camera, size } = useThree();
 
   useLayoutEffect(() => {
+    const parent = object.parent;
+    const savedY = parent?.position.y ?? 0;
+    if (parent) {
+      parent.position.y = 0;
+      parent.updateWorldMatrix(true, true);
+    }
+    object.updateWorldMatrix(true, true);
+
     const box = new THREE.Box3().setFromObject(object);
-    if (box.isEmpty()) return;
+    if (box.isEmpty()) {
+      if (parent) parent.position.y = savedY;
+      return;
+    }
 
     const center = box.getCenter(new THREE.Vector3());
     const sphere = box.getBoundingSphere(new THREE.Sphere());
     const persp = camera as THREE.PerspectiveCamera;
-    const fov = THREE.MathUtils.degToRad(persp.fov);
-    const dist = (sphere.radius * 1.28) / Math.sin(fov / 2);
+    const aspect = size.width / Math.max(size.height, 1);
+    const refVFov = THREE.MathUtils.degToRad(28);
+    const hFov = 2 * Math.atan(Math.tan(refVFov / 2) * 0.85);
+    persp.fov = THREE.MathUtils.radToDeg(
+      2 * Math.atan(Math.tan(hFov / 2) / aspect)
+    );
+    const dist = (sphere.radius * 1.42) / Math.sin(refVFov / 2);
     const direction = new THREE.Vector3(0.58, 0.22, 1).normalize();
     const target = center.clone();
-    target.y += sphere.radius * 0.08;
-    target.x -= 0.05
+    target.y += sphere.radius * 0.03;
+    target.x -= 0.05;
 
     camera.position.copy(center).addScaledVector(direction, dist);
     camera.near = Math.max(dist / 80, 0.01);
     camera.far = dist * 20;
     camera.lookAt(target);
     persp.updateProjectionMatrix();
+
+    if (parent) {
+      parent.position.y = savedY;
+      parent.updateWorldMatrix(true, true);
+    }
   }, [object, camera, size]);
 
   return null;
 }
 
 function CrtModel() {
+  const drop = useRef<THREE.Group>(null);
+  const progress = useRef(0);
+  const landed = useRef(false);
+  const powered = useRef(false);
+  const settle = useRef(0);
+  const hang = useRef(0);
   const drawer = useMemo(() => createScreenDrawer(), []);
   const [model, setModel] = useState<THREE.Object3D | null>(null);
+  const dropHeight = useMemo(() => {
+    if (!model) return 1.1;
+    const box = new THREE.Box3().setFromObject(model);
+    return Math.max(1.5, (box.max.y - box.min.y) * 5);
+  }, [model]);
 
   useEffect(() => {
     let cancelled = false;
@@ -310,15 +380,60 @@ function CrtModel() {
     };
   }, [drawer]);
 
+  useLayoutEffect(() => {
+    if (drop.current && model) {
+      drop.current.position.y = dropHeight;
+    }
+  }, [model, dropHeight]);
+
   useFrame((_, delta) => {
+    const group = drop.current;
+    if (!group || !model) return;
+
+    const reducedMotion =
+      typeof window !== 'undefined' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    if (reducedMotion) {
+      group.position.y = 0;
+      if (!powered.current) {
+        powered.current = true;
+        drawer.powerOn();
+      }
+      drawer.advance(delta);
+      return;
+    }
+
+    if (!landed.current) {
+      hang.current += delta;
+      if (hang.current < DROP_HANG) {
+        group.position.y = dropHeight;
+        return;
+      }
+      progress.current = Math.min(1, progress.current + delta / DROP_DURATION);
+      group.position.y = dropHeight * (1 - easeOutBounce(progress.current));
+      if (progress.current >= 1) {
+        landed.current = true;
+        group.position.y = 0;
+      }
+    } else if (!powered.current) {
+      settle.current += delta;
+      if (settle.current >= POWER_DELAY) {
+        powered.current = true;
+        drawer.powerOn();
+      }
+    }
+
     drawer.advance(delta);
   });
 
   if (!model) return null;
 
   return (
-    <group rotation={[0, 0, 0]}>
-      <primitive object={model} />
+    <group>
+      <group ref={drop}>
+        <primitive object={model} />
+      </group>
       <FrameModel object={model} />
     </group>
   );
