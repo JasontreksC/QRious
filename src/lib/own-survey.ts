@@ -3,7 +3,7 @@ import {
   currentRegistrationRound,
   type RegistrationRound,
 } from '@/lib/deadline';
-import { nameKey, phoneDigits } from '@/lib/phone';
+import { parseStudentNumber } from '@/lib/student-number';
 
 export type OwnSurvey = {
   student_id: string;
@@ -29,16 +29,13 @@ export type OwnSurvey = {
 export type StudentIdentity = {
   name: string;
   phone: string;
+  studentNumber: string;
 };
 
-function identityKeys(identity: StudentIdentity): {
-  name: string;
-  phone: string;
-} | null {
-  const name = nameKey(identity.name);
-  const phone = phoneDigits(identity.phone);
-  if (!name || !phone) return null;
-  return { name, phone };
+function identityKeys(identity: StudentIdentity): { studentNumber: string } | null {
+  const studentNumber = parseStudentNumber(identity.studentNumber);
+  if (!studentNumber) return null;
+  return { studentNumber };
 }
 
 export async function listStudentRounds(
@@ -51,8 +48,7 @@ export async function listStudentRounds(
     SELECT r.round
     FROM registration r
     JOIN student s ON s.student_id = r.student_id
-    WHERE lower(btrim(s.name)) = ${keys.name}
-      AND regexp_replace(s.phone, '[^0-9]', '', 'g') = ${keys.phone}
+    WHERE s.student_id = ${keys.studentNumber}
     ORDER BY r.round ASC
   `;
   return rows
@@ -72,8 +68,7 @@ export async function loadRoundSubmittedAts(
     FROM registration r
     JOIN student s ON s.student_id = r.student_id
     JOIN consent c ON c.registration_id = r.registration_id
-    WHERE lower(btrim(s.name)) = ${keys.name}
-      AND regexp_replace(s.phone, '[^0-9]', '', 'g') = ${keys.phone}
+    WHERE s.student_id = ${keys.studentNumber}
     GROUP BY r.round
   `;
   for (const row of rows) {
@@ -99,8 +94,7 @@ export async function studentHasRoundByIdentity(
     SELECT 1
     FROM registration r
     JOIN student s ON s.student_id = r.student_id
-    WHERE lower(btrim(s.name)) = ${keys.name}
-      AND regexp_replace(s.phone, '[^0-9]', '', 'g') = ${keys.phone}
+    WHERE s.student_id = ${keys.studentNumber}
       AND r.round = ${round}
     LIMIT 1
   `;
@@ -144,9 +138,8 @@ export async function loadOwnSurvey(
         FROM registration r
         JOIN student s ON s.student_id = r.student_id
         JOIN major m ON m.major_id = s.major_id
-        WHERE lower(btrim(s.name)) = ${keys.name}
-          AND regexp_replace(s.phone, '[^0-9]', '', 'g') = ${keys.phone}
-          AND r.round = ${round}
+    WHERE s.student_id = ${keys.studentNumber}
+      AND r.round = ${round}
         LIMIT 1
       `
     : await sql`
@@ -164,8 +157,7 @@ export async function loadOwnSurvey(
         FROM registration r
         JOIN student s ON s.student_id = r.student_id
         JOIN major m ON m.major_id = s.major_id
-        WHERE lower(btrim(s.name)) = ${keys.name}
-          AND regexp_replace(s.phone, '[^0-9]', '', 'g') = ${keys.phone}
+        WHERE s.student_id = ${keys.studentNumber}
         ORDER BY r.round DESC
         LIMIT 1
       `;

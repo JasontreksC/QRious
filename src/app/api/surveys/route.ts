@@ -26,7 +26,12 @@ import { loadEventTimes } from '@/lib/event-schedule';
 import { getSql } from '@/lib/db';
 import { isUniqueViolation, jsonError } from '@/lib/http';
 import { deleteOrphanStudent, loadOwnSurvey } from '@/lib/own-survey';
-import { formatKrPhone, isValidKrPhone, nameKey, phoneDigits } from '@/lib/phone';
+import { formatKrPhone, isValidKrPhone } from '@/lib/phone';
+import {
+  StudentNumberConflict,
+  adoptStudentNumber,
+  parseStudentNumber,
+} from '@/lib/student-number';
 import {
   SESSION_COOKIE,
   encodeSession,
@@ -80,7 +85,7 @@ function asCharmIds(value: unknown): string[] | null {
 function requireSession(req: NextRequest) {
   const session = getSessionFromRequest(req);
   if (!session) {
-    return jsonError(401, 'UNAUTHORIZED', '이름과 전화번호로 로그인해 주세요.');
+    return jsonError(401, 'UNAUTHORIZED', '이름, 학번, 전화번호로 로그인해 주세요.');
   }
   return session;
 }
@@ -118,7 +123,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const session = getSessionFromRequest(req);
   if (!session) {
-    return jsonError(401, 'UNAUTHORIZED', '이름과 전화번호로 로그인해 주세요.');
+    return jsonError(401, 'UNAUTHORIZED', '이름, 학번, 전화번호로 로그인해 주세요.');
   }
 
   const sql = getSql();
@@ -162,8 +167,9 @@ export async function POST(req: NextRequest) {
   if (typeof body.gender !== 'boolean') {
     return jsonError(400, 'VALIDATION_ERROR', '성별을 선택해 주세요.');
   }
-  if (!session.birth) {
-    return jsonError(401, 'UNAUTHORIZED', '이름과 전화번호로 로그인해 주세요.');
+  const studentNumber = parseStudentNumber(session.studentNumber);
+  if (!session.birth || !studentNumber) {
+    return jsonError(401, 'UNAUTHORIZED', '이름, 학번, 전화번호로 로그인해 주세요.');
   }
   if (!mbti || !MBTI_OPTIONS.has(mbti)) {
     return jsonError(400, 'VALIDATION_ERROR', 'MBTI를 올바르게 선택해 주세요.');
@@ -240,16 +246,19 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    await adoptStudentNumber(sql, {
+      studentNumber,
+      name,
+      phone,
+      birth,
+    });
     const existingPerson = await sql`
       SELECT student_id
       FROM student
-      WHERE lower(btrim(name)) = ${nameKey(name)}
-        AND regexp_replace(phone, '[^0-9]', '', 'g') = ${phoneDigits(phone)}
+      WHERE student_id = ${studentNumber}
       LIMIT 1
     `;
-    const studentId = existingPerson[0]
-      ? String(existingPerson[0].student_id)
-      : randomUUID();
+    const studentId = studentNumber;
     const isNewPerson = existingPerson.length === 0;
 
     if (!isNewPerson) {
@@ -427,11 +436,23 @@ export async function POST(req: NextRequest) {
       { student_id: studentId, registration_id: registrationId },
       { status: 201 }
     );
-    const token = encodeSession({ name, phone, birth: session.birth });
+    const token = encodeSession({
+      name,
+      phone,
+      birth: session.birth,
+      studentNumber,
+    });
     if (token) res.cookies.set(SESSION_COOKIE, token, sessionCookieOptions());
     return res;
   } catch (err) {
     console.error('POST /api/surveys', err);
+    if (err instanceof StudentNumberConflict) {
+      return jsonError(
+        409,
+        'STUDENT_NUMBER_CONFLICT',
+        '이 학번은 다른 접수 정보와 겹칩니다. 이름과 전화번호를 확인해 주세요.'
+      );
+    }
     if (isUniqueViolation(err)) {
       return jsonError(
         409,
@@ -454,7 +475,7 @@ export async function POST(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   const session = getSessionFromRequest(req);
   if (!session) {
-    return jsonError(401, 'UNAUTHORIZED', '이름과 전화번호로 로그인해 주세요.');
+    return jsonError(401, 'UNAUTHORIZED', '이름, 학번, 전화번호로 로그인해 주세요.');
   }
 
   const roundSql = getSql();
@@ -494,8 +515,7 @@ export async function PATCH(req: NextRequest) {
       SELECT r.registration_id, r.student_id
       FROM registration r
       JOIN student s ON s.student_id = r.student_id
-      WHERE lower(btrim(s.name)) = ${nameKey(session.name)}
-        AND regexp_replace(s.phone, '[^0-9]', '', 'g') = ${phoneDigits(session.phone)}
+      WHERE s.student_id = ${session.studentNumber}
         AND r.round = ${round}
       LIMIT 1
     `;
@@ -685,7 +705,7 @@ export async function PATCH(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   const session = getSessionFromRequest(req);
   if (!session) {
-    return jsonError(401, 'UNAUTHORIZED', '이름과 전화번호로 로그인해 주세요.');
+    return jsonError(401, 'UNAUTHORIZED', '이름, 학번, 전화번호로 로그인해 주세요.');
   }
 
   const sql = getSql();
@@ -700,8 +720,7 @@ export async function DELETE(req: NextRequest) {
       DELETE FROM registration r
       USING student s
       WHERE r.student_id = s.student_id
-        AND lower(btrim(s.name)) = ${nameKey(session.name)}
-        AND regexp_replace(s.phone, '[^0-9]', '', 'g') = ${phoneDigits(session.phone)}
+        AND s.student_id = ${session.studentNumber}
         AND r.round = ${round}
       RETURNING r.student_id
     `;

@@ -200,6 +200,7 @@ export type AuthSession =
       name: string;
       phone: string;
       birth: string;
+      studentNumber: string;
       submitted: boolean;
       rounds: number[];
       round1SubmittedAt: string | null;
@@ -215,11 +216,12 @@ export async function getAuthSession(): Promise<AuthSession> {
 export async function loginWithNamePhone(
   name: string,
   phone: string,
-  birth: string
+  birth: string,
+  studentNumber: string
 ): Promise<void> {
   await request<{ ok: boolean }>('/api/auth/login', {
     method: 'POST',
-    body: JSON.stringify({ name, phone, birth }),
+    body: JSON.stringify({ name, phone, birth, studentNumber }),
   });
 }
 

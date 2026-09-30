@@ -29,6 +29,7 @@ export async function GET(req: NextRequest) {
     const sheet = workbook.addWorksheet('참가자');
 
     sheet.columns = [
+      { header: '학번', key: 'student_id', width: 14 },
       { header: '이름', key: 'name', width: 12 },
       { header: '차수', key: 'round', width: 8 },
       { header: '학과', key: 'major', width: 22 },
@@ -53,6 +54,7 @@ export async function GET(req: NextRequest) {
 
     for (const s of students) {
       sheet.addRow({
+        student_id: s.student_id,
         name: s.name,
         round: `${s.round}차`,
         major: s.major ?? '',

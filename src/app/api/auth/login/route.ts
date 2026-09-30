@@ -2,8 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { identityIsAdmin } from '@/lib/admin-auth';
 import { isValidBirth, normalizeBirth } from '@/lib/birth';
 import { getSql } from '@/lib/db';
-import { jsonError } from '@/lib/http';
-import { isValidKrPhone, nameKey, phoneDigits } from '@/lib/phone';
+import { isUniqueViolation, jsonError } from '@/lib/http';
+import { isValidKrPhone, phoneDigits } from '@/lib/phone';
+import {
+  StudentNumberConflict,
+  adoptStudentNumber,
+  parseStudentNumber,
+} from '@/lib/student-number';
 import { parseSubmittedName } from '@/lib/student-name';
 import {
   SESSION_COOKIE,
@@ -23,13 +28,14 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  let body: { name?: unknown; phone?: unknown; birth?: unknown };
+  let body: {
+    name?: unknown;
+    phone?: unknown;
+    birth?: unknown;
+    studentNumber?: unknown;
+  };
   try {
-    body = (await req.json()) as {
-      name?: unknown;
-      phone?: unknown;
-      birth?: unknown;
-    };
+    body = (await req.json()) as typeof body;
   } catch {
     return jsonError(400, 'VALIDATION_ERROR', 'JSON 본문이 올바르지 않습니다.');
   }
@@ -37,8 +43,16 @@ export async function POST(req: NextRequest) {
   const name = parseSubmittedName(body.name);
   const phone = typeof body.phone === 'string' ? body.phone : '';
   const birthRaw = typeof body.birth === 'string' ? body.birth : '';
+  const studentNumber = parseStudentNumber(body.studentNumber);
   if (!name) {
     return jsonError(400, 'VALIDATION_ERROR', '이름을 올바르게 입력해 주세요.');
+  }
+  if (!studentNumber) {
+    return jsonError(
+      400,
+      'VALIDATION_ERROR',
+      '학번은 10자리 숫자로 입력해 주세요.'
+    );
   }
   if (!isValidKrPhone(phone)) {
     return jsonError(
@@ -66,17 +80,30 @@ export async function POST(req: NextRequest) {
   const phoneNorm = phoneDigits(phone);
   try {
     const sql = getSql();
-    await sql`
-      UPDATE student
-      SET birth = ${birth}
-      WHERE lower(btrim(name)) = ${nameKey(name)}
-        AND regexp_replace(phone, '[^0-9]', '', 'g') = ${phoneNorm}
-    `;
+    await adoptStudentNumber(sql, {
+      studentNumber,
+      name,
+      phone: phoneNorm,
+      birth,
+    });
   } catch (err) {
-    console.error('POST /api/auth/login birth', err);
+    console.error('POST /api/auth/login', err);
+    if (err instanceof StudentNumberConflict || isUniqueViolation(err)) {
+      return jsonError(
+        409,
+        'STUDENT_NUMBER_CONFLICT',
+        '이 학번은 다른 접수 정보와 겹칩니다. 이름과 전화번호를 확인해 주세요.'
+      );
+    }
+    return jsonError(500, 'INTERNAL_ERROR', '로그인에 실패했습니다.');
   }
 
-  const token = encodeSession({ name, phone: phoneNorm, birth });
+  const token = encodeSession({
+    name,
+    phone: phoneNorm,
+    birth,
+    studentNumber,
+  });
   if (!token) {
     return jsonError(
       503,
@@ -89,6 +116,7 @@ export async function POST(req: NextRequest) {
     name,
     phone: phoneNorm,
     birth,
+    studentNumber,
     exp: 0,
   });
   const res = NextResponse.json({ ok: true, isAdmin });

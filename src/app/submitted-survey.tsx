@@ -301,6 +301,35 @@ export function SubmittedSurvey({
         </div>
       </div>
 
+      <div className="py-3 border-b border-[#F0D9DF]/80 text-left">
+        <p className="text-[11px] font-semibold tracking-wide text-[#8C7A8E] uppercase shrink-0 pt-0.5">
+          학번
+        </p>
+        <div className="mt-1.5 text-sm text-[#2B1B2E] leading-relaxed">
+          <span className="font-semibold">
+            {/^\d{10}$/.test(survey.student_id) ? survey.student_id : '-'}
+          </span>
+        </div>
+      </div>
+
+      <div className="py-3 border-b border-[#F0D9DF]/80 text-left">
+        <p className="text-[11px] font-semibold tracking-wide text-[#8C7A8E] uppercase shrink-0 pt-0.5">
+          전화번호
+        </p>
+        <div className="mt-1.5 text-sm text-[#2B1B2E] leading-relaxed">
+          {survey.phone}
+        </div>
+      </div>
+
+      <div className="py-3 border-b border-[#F0D9DF]/80 text-left">
+        <p className="text-[11px] font-semibold tracking-wide text-[#8C7A8E] uppercase shrink-0 pt-0.5">
+          생년월일
+        </p>
+        <div className="mt-1.5 text-sm text-[#2B1B2E] leading-relaxed">
+          {survey.birth ? formatBirth(survey.birth) : '-'}
+        </div>
+      </div>
+
       {row(
         'major',
         '학과',
@@ -321,15 +350,6 @@ export function SubmittedSurvey({
           ))}
         </select>
       )}
-
-      <div className="py-3 border-b border-[#F0D9DF]/80 text-left">
-        <p className="text-[11px] font-semibold tracking-wide text-[#8C7A8E] uppercase shrink-0 pt-0.5">
-          전화번호
-        </p>
-        <div className="mt-1.5 text-sm text-[#2B1B2E] leading-relaxed">
-          {survey.phone}
-        </div>
-      </div>
 
       {row(
         'gender',
@@ -364,15 +384,6 @@ export function SubmittedSurvey({
           </button>
         </div>
       )}
-
-      <div className="py-3 border-b border-[#F0D9DF]/80 text-left">
-        <p className="text-[11px] font-semibold tracking-wide text-[#8C7A8E] uppercase shrink-0 pt-0.5">
-          생년월일
-        </p>
-        <div className="mt-1.5 text-sm text-[#2B1B2E] leading-relaxed">
-          {survey.birth ? formatBirth(survey.birth) : '-'}
-        </div>
-      </div>
 
       {row(
         'agePref',

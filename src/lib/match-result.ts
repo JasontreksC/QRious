@@ -3,8 +3,8 @@ import type { Sql } from '@/lib/db';
 import { getSql } from '@/lib/db';
 import { eventTimeMs, type EventTimes } from '@/lib/deadline';
 import { loadEventTimes } from '@/lib/event-schedule';
-import { nameKey, phoneDigits } from '@/lib/phone';
 import type { StudentIdentity } from '@/lib/own-survey';
+import { parseStudentNumber } from '@/lib/student-number';
 
 export type MatchPartner = {
   round: 1 | 2;
@@ -17,14 +17,10 @@ export type MatchPartner = {
   have: string[];
 };
 
-function identityKeys(identity: StudentIdentity): {
-  name: string;
-  phone: string;
-} | null {
-  const name = nameKey(identity.name);
-  const phone = phoneDigits(identity.phone);
-  if (!name || !phone) return null;
-  return { name, phone };
+function identityKeys(identity: StudentIdentity): { studentNumber: string } | null {
+  const studentNumber = parseStudentNumber(identity.studentNumber);
+  if (!studentNumber) return null;
+  return { studentNumber };
 }
 
 /** 2차 접수한 사람은 1차 매칭을 무시합니다. 2차 발표 후에만 2차 매칭을 보여 줍니다. */
@@ -78,8 +74,7 @@ async function loadMatchRows(
         END
       JOIN student AS partner ON partner.student_id = partner_r.student_id
       LEFT JOIN major ON major.major_id = partner.major_id
-      WHERE lower(btrim(me_s.name)) = ${keys.name}
-        AND regexp_replace(me_s.phone, '[^0-9]', '', 'g') = ${keys.phone}
+      WHERE me_s.student_id = ${keys.studentNumber}
         AND me.round = ${round}
       ORDER BY COALESCE(mr.round, me.round) DESC, me.round DESC
       LIMIT 1
@@ -107,8 +102,7 @@ async function loadMatchRows(
       END
     JOIN student AS partner ON partner.student_id = partner_r.student_id
     LEFT JOIN major ON major.major_id = partner.major_id
-    WHERE lower(btrim(me_s.name)) = ${keys.name}
-      AND regexp_replace(me_s.phone, '[^0-9]', '', 'g') = ${keys.phone}
+    WHERE me_s.student_id = ${keys.studentNumber}
     ORDER BY COALESCE(mr.round, me.round) DESC, me.round DESC
     LIMIT 1
   `;
@@ -149,8 +143,7 @@ async function studentRoundsByIdentity(
     SELECT r.round
     FROM registration r
     JOIN student s ON s.student_id = r.student_id
-    WHERE lower(btrim(s.name)) = ${keys.name}
-      AND regexp_replace(s.phone, '[^0-9]', '', 'g') = ${keys.phone}
+    WHERE s.student_id = ${keys.studentNumber}
   `;
   return rows
     .map((row) => Number(row.round))
@@ -173,8 +166,7 @@ export async function studentHasMatchByIdentity(
     JOIN student AS me_s ON me_s.student_id = me.student_id
     JOIN match_result AS mr
       ON mr.male_id = me.registration_id OR mr.female_id = me.registration_id
-    WHERE lower(btrim(me_s.name)) = ${keys.name}
-      AND regexp_replace(me_s.phone, '[^0-9]', '', 'g') = ${keys.phone}
+    WHERE me_s.student_id = ${keys.studentNumber}
   `;
   const matchRounds = new Set(
     matchRows

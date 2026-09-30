@@ -41,6 +41,7 @@ export async function GET(req: NextRequest) {
     name: session.name,
     phone: formatKrPhone(session.phone),
     birth: session.birth,
+    studentNumber: session.studentNumber,
     submitted,
     rounds,
     round1SubmittedAt,

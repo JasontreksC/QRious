@@ -53,6 +53,7 @@ export default function AdminStudentsPage() {
     return students.filter(
       (s) =>
         s.name.toLowerCase().includes(q) ||
+        s.student_id.toLowerCase().includes(q) ||
         s.phone.replace(/\D/g, '').includes(q.replace(/\D/g, '')) ||
         (s.birth ?? '').includes(q.replace(/\D/g, '')) ||
         (s.major ?? '').toLowerCase().includes(q)
@@ -141,7 +142,7 @@ export default function AdminStudentsPage() {
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="이름, 전화번호 또는 학과 검색"
+            placeholder="이름, 학번, 전화번호 또는 학과 검색"
             className="w-44 sm:w-56 px-3 py-2 rounded-lg border border-[#F0D9DF] bg-[#FDE8EC] text-sm outline-none placeholder-[#C9B0BE] focus:border-[#E8526A] focus:bg-white"
           />
           <button
@@ -182,7 +183,8 @@ export default function AdminStudentsPage() {
           <table className="w-full min-w-[720px] text-sm text-left">
             <thead className="sticky top-0 bg-white z-10">
               <tr className="text-xs uppercase tracking-wider text-[#8C7A8E] border-b border-[#F0D9DF]">
-                <th className="py-2 px-5 font-semibold">이름</th>
+                <th className="py-2 px-5 font-semibold">학번</th>
+                <th className="py-2 pr-3 font-semibold">이름</th>
                 <th className="py-2 pr-3 font-semibold">차수</th>
                 <th className="py-2 pr-3 font-semibold">학과</th>
                 <th className="py-2 pr-3 font-semibold">전화번호</th>
@@ -198,7 +200,12 @@ export default function AdminStudentsPage() {
                 return (
                   <React.Fragment key={student.registration_id}>
                     <tr className="border-b border-[#F0D9DF]/80">
-                      <td className="py-3 px-5">{student.name}</td>
+                      <td className="py-3 px-5 font-mono text-[13px]">
+                        {/^\d{10}$/.test(student.student_id)
+                          ? student.student_id
+                          : '-'}
+                      </td>
+                      <td className="py-3 pr-3">{student.name}</td>
                       <td className="py-3 pr-3">{student.round}차</td>
                       <td className="py-3 pr-3">{student.major || '-'}</td>
                       <td className="py-3 pr-3 font-mono text-[13px]">

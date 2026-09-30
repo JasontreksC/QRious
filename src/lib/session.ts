@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import { NextRequest } from 'next/server';
 import { normalizeBirth } from '@/lib/birth';
 import { phoneDigits } from '@/lib/phone';
+import { parseStudentNumber } from '@/lib/student-number';
 
 export const SESSION_COOKIE = 'qrious_session';
 export const LEGACY_GOOGLE_COOKIE = 'qrious_google';
@@ -13,6 +14,7 @@ export type AppSession = {
   name: string;
   phone: string;
   birth: string;
+  studentNumber: string;
   exp: number;
 };
 
@@ -64,13 +66,17 @@ export function encodeSession(session: Omit<AppSession, 'exp'>): string | null {
   const secret = getAuthSecret();
   if (!secret) return null;
   const birth = normalizeBirth(session.birth);
+  const studentNumber = parseStudentNumber(session.studentNumber);
   const payload: AppSession = {
     name: normalizeSessionName(session.name),
     phone: phoneDigits(session.phone),
     birth: birth ?? '',
+    studentNumber: studentNumber ?? '',
     exp: Math.floor(Date.now() / 1000) + SESSION_MAX_AGE_SEC,
   };
-  if (!payload.name || !payload.phone || !payload.birth) return null;
+  if (!payload.name || !payload.phone || !payload.birth || !payload.studentNumber) {
+    return null;
+  }
   const encoded = Buffer.from(JSON.stringify(payload), 'utf8').toString(
     'base64url'
   );
@@ -92,6 +98,7 @@ export function decodeSession(token: string | undefined): AppSession | null {
       typeof parsed.name !== 'string' ||
       typeof parsed.phone !== 'string' ||
       typeof parsed.birth !== 'string' ||
+      typeof parsed.studentNumber !== 'string' ||
       typeof parsed.exp !== 'number'
     ) {
       return null;
@@ -100,8 +107,9 @@ export function decodeSession(token: string | undefined): AppSession | null {
     const name = normalizeSessionName(parsed.name);
     const phone = phoneDigits(parsed.phone);
     const birth = normalizeBirth(parsed.birth);
-    if (!name || !phone || !birth) return null;
-    return { name, phone, birth, exp: parsed.exp };
+    const studentNumber = parseStudentNumber(parsed.studentNumber);
+    if (!name || !phone || !birth || !studentNumber) return null;
+    return { name, phone, birth, studentNumber, exp: parsed.exp };
   } catch {
     return null;
   }

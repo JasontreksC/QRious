@@ -136,6 +136,7 @@ export function filterStudents(
   return students.filter(
     (s) =>
       s.name.toLowerCase().includes(q) ||
+      s.student_id.toLowerCase().includes(q) ||
       s.phone.replace(/\D/g, '').includes(q.replace(/\D/g, '')) ||
       (s.birth ?? '').includes(q.replace(/\D/g, '')) ||
       (s.major ?? '').toLowerCase().includes(q)

@@ -42,6 +42,7 @@ import {
   type AgePrefSpecificId,
 } from '@/lib/age-pref';
 import { birthDigits, formatBirth, isValidBirth } from '@/lib/birth';
+import { parseStudentNumber, studentNumberDigits } from '@/lib/student-number';
 import {
   STUDENT_NAME_MAX,
   STUDENT_NAME_MIN,
@@ -99,6 +100,7 @@ function NamePhoneLogin({
   onLoggedIn: () => Promise<void>;
 }) {
   const [name, setName] = useState('');
+  const [studentNumber, setStudentNumber] = useState('');
   const [phone, setPhone] = useState('');
   const [birth, setBirth] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -115,6 +117,10 @@ function NamePhoneLogin({
       setError('이름은 20글자 이하여야 합니다.');
       return;
     }
+    if (!parseStudentNumber(studentNumber)) {
+      setError('학번은 10자리 숫자로 입력해 주세요.');
+      return;
+    }
     if (!isValidKrPhone(phone)) {
       setError('휴대폰 번호 형식(010-1234-5678)으로 입력해 주세요.');
       return;
@@ -126,7 +132,12 @@ function NamePhoneLogin({
     setSubmitting(true);
     setError('');
     try {
-      await loginWithNamePhone(trimmedName, phone, birthDigits(birth));
+      await loginWithNamePhone(
+        trimmedName,
+        phone,
+        birthDigits(birth),
+        studentNumber
+      );
       await onLoggedIn();
     } catch (err) {
       setError(err instanceof Error ? err.message : '로그인에 실패했습니다.');
@@ -151,6 +162,25 @@ function NamePhoneLogin({
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="예) 홍길동"
+          className="w-full px-4 py-3 border-1.5 border-[#F0D9DF] rounded-xl font-sans text-[16px] text-[#2B1B2E] bg-[#FDE8EC] outline-none placeholder-[#C9B0BE] focus:border-[#E8526A] focus:bg-white"
+        />
+      </div>
+      <div className="flex flex-col gap-1 text-left">
+        <label
+          htmlFor="login-student-number"
+          className="text-xs font-semibold text-[#8C7A8E] tracking-wider uppercase"
+        >
+          학번
+        </label>
+        <input
+          id="login-student-number"
+          type="text"
+          inputMode="numeric"
+          autoComplete="off"
+          maxLength={10}
+          value={studentNumber}
+          onChange={(e) => setStudentNumber(studentNumberDigits(e.target.value))}
+          placeholder="예) 2020123456"
           className="w-full px-4 py-3 border-1.5 border-[#F0D9DF] rounded-xl font-sans text-[16px] text-[#2B1B2E] bg-[#FDE8EC] outline-none placeholder-[#C9B0BE] focus:border-[#E8526A] focus:bg-white"
         />
       </div>
@@ -926,6 +956,9 @@ export default function Home({
                       {authSession.name}
                     </p>
                     <p className="truncate text-xs text-[#8C7A8E]">
+                      {authSession.studentNumber}
+                    </p>
+                    <p className="truncate text-xs text-[#8C7A8E]">
                       {authSession.phone}
                     </p>
                     <p className="truncate text-xs text-[#8C7A8E]">
@@ -974,6 +1007,9 @@ export default function Home({
                 <div className="min-w-0 flex-1 text-left">
                   <p className="truncate text-sm font-semibold text-[#2B1B2E]">
                     {authSession.name}
+                  </p>
+                  <p className="truncate text-xs text-[#8C7A8E]">
+                    {authSession.studentNumber}
                   </p>
                   <p className="truncate text-xs text-[#8C7A8E]">
                     {authSession.phone}
