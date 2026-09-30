@@ -818,12 +818,14 @@ export default function Home({
             </span>
           </h1>
           <p className={styles.heroCopy}>
-            컴소과가 말아주는 캠퍼스 소개팅{' '}
+            컴소과가 2026 양지대동제 이벤트로 
+            <br />
+            캠퍼스 소개팅을 준비했습니다.{' '}
             <span className={styles.heroHeart} aria-hidden="true">
               ♡
             </span>
             <br />
-            즐거운 양지대동제를 새 인연과 시작해보세요!
+            즐거운 축제를 새 인연과 시작해보세요!
           </p>
         </div>
 
