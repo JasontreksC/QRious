@@ -187,6 +187,7 @@ export type AdminStudent = {
   ex_want: string | null;
   consent_agreed: boolean | null;
   consented_at: string | null;
+  submitted_at: string | null;
   consent_version: string | null;
   third_party_consent_agreed: boolean | null;
   third_party_consented_at: string | null;

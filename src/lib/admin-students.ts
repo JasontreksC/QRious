@@ -84,6 +84,7 @@ export async function fetchJoinedStudents(sql: Sql): Promise<AdminStudent[]> {
   type ConsentRow = { agreed: boolean; consented_at: string; version: string };
   const consentMap = new Map<string, ConsentRow>();
   const thirdPartyMap = new Map<string, ConsentRow>();
+  const submittedAtMap = new Map<string, string>();
   for (const row of consents) {
     const id = String(row.registration_id);
     const entry: ConsentRow = {
@@ -95,8 +96,14 @@ export async function fetchJoinedStudents(sql: Sql): Promise<AdminStudent[]> {
     };
     if (isThirdPartyConsentVersion(entry.version)) {
       if (!thirdPartyMap.has(id)) thirdPartyMap.set(id, entry);
-    } else if (!consentMap.has(id)) {
-      consentMap.set(id, entry);
+    } else {
+      if (!consentMap.has(id)) consentMap.set(id, entry);
+      if (entry.consented_at) {
+        const prev = submittedAtMap.get(id);
+        if (!prev || entry.consented_at < prev) {
+          submittedAtMap.set(id, entry.consented_at);
+        }
+      }
     }
   }
 
@@ -119,6 +126,7 @@ export async function fetchJoinedStudents(sql: Sql): Promise<AdminStudent[]> {
       ex_want: exWantMap.get(id) || null,
       consent_agreed: consentMap.get(id)?.agreed ?? null,
       consented_at: consentMap.get(id)?.consented_at || null,
+      submitted_at: submittedAtMap.get(id) || null,
       consent_version: consentMap.get(id)?.version || null,
       third_party_consent_agreed: thirdPartyMap.get(id)?.agreed ?? null,
       third_party_consented_at: thirdPartyMap.get(id)?.consented_at || null,

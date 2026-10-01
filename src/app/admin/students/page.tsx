@@ -10,6 +10,29 @@ import {
 
 const PAGE_SIZES = [10, 20, 30, 50] as const;
 
+type ListSort = 'latest' | 'registered';
+
+function submittedTime(student: AdminStudent): number {
+  const raw = student.submitted_at;
+  if (!raw) return 0;
+  const time = new Date(raw).getTime();
+  return Number.isNaN(time) ? 0 : time;
+}
+
+function formatSubmittedAt(iso: string | null): string {
+  if (!iso) return '-';
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '-';
+  return new Intl.DateTimeFormat('ko-KR', {
+    timeZone: 'Asia/Seoul',
+    month: 'numeric',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).format(date);
+}
+
 export default function AdminStudentsPage() {
   const [students, setStudents] = useState<AdminStudent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -18,6 +41,7 @@ export default function AdminStudentsPage() {
   const [pageSize, setPageSize] = useState<number>(10);
   const [page, setPage] = useState(1);
   const [query, setQuery] = useState('');
+  const [sort, setSort] = useState<ListSort>('latest');
   const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
@@ -47,23 +71,32 @@ export default function AdminStudentsPage() {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return students;
-    return students.filter(
-      (s) =>
-        s.name.toLowerCase().includes(q) ||
-        s.student_id.toLowerCase().includes(q) ||
-        s.phone.replace(/\D/g, '').includes(q.replace(/\D/g, '')) ||
-        (s.birth ?? '').includes(q.replace(/\D/g, '')) ||
-        (s.major ?? '').toLowerCase().includes(q)
-    );
-  }, [students, query]);
+    const matched = !q
+      ? students
+      : students.filter(
+          (s) =>
+            s.name.toLowerCase().includes(q) ||
+            s.student_id.toLowerCase().includes(q) ||
+            s.phone.replace(/\D/g, '').includes(q.replace(/\D/g, '')) ||
+            (s.birth ?? '').includes(q.replace(/\D/g, '')) ||
+            (s.major ?? '').toLowerCase().includes(q)
+        );
+    return [...matched].sort((a, b) => {
+      const timeA = submittedTime(a);
+      const timeB = submittedTime(b);
+      if (!timeA && !timeB) return 0;
+      if (!timeA) return 1;
+      if (!timeB) return -1;
+      return sort === 'latest' ? timeB - timeA : timeA - timeB;
+    });
+  }, [students, query, sort]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
 
   useEffect(() => {
     setPage(1);
     setExpandedId(null);
-  }, [query]);
+  }, [query, sort]);
 
   useEffect(() => {
     setPage((p) => Math.min(p, totalPages));
@@ -118,6 +151,27 @@ export default function AdminStudentsPage() {
             placeholder="이름, 학번, 전화번호 또는 학과 검색"
             className="w-44 sm:w-56 px-3 py-2 rounded-lg border border-[#F0D9DF] bg-[#FDE8EC] text-sm outline-none placeholder-[#C9B0BE] focus:border-[#E8526A] focus:bg-white"
           />
+          <div className="flex rounded-lg border border-[#F0D9DF] overflow-hidden text-xs font-bold">
+            {(
+              [
+                ['latest', '최신순'],
+                ['registered', '접수순'],
+              ] as const
+            ).map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setSort(id)}
+                className={`px-3 py-2 ${
+                  sort === id
+                    ? 'bg-[#E8526A] text-white'
+                    : 'bg-white text-[#8C7A8E] hover:bg-[#FDE8EC]'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
           <button
             type="button"
             onClick={handleExport}
@@ -156,7 +210,8 @@ export default function AdminStudentsPage() {
           <table className="w-full min-w-[720px] text-sm text-left">
             <thead className="sticky top-0 bg-white z-10">
               <tr className="text-xs uppercase tracking-wider text-[#8C7A8E] border-b border-[#F0D9DF]">
-                <th className="py-2 px-5 font-semibold">학번</th>
+                <th className="py-2 px-5 font-semibold">접수 시각</th>
+                <th className="py-2 pr-3 font-semibold">학번</th>
                 <th className="py-2 pr-3 font-semibold">이름</th>
                 <th className="py-2 pr-3 font-semibold">차수</th>
                 <th className="py-2 pr-3 font-semibold">학과</th>
@@ -173,7 +228,10 @@ export default function AdminStudentsPage() {
                 return (
                   <React.Fragment key={student.registration_id}>
                     <tr className="border-b border-[#F0D9DF]/80">
-                      <td className="py-3 px-5 font-mono text-[13px]">
+                      <td className="py-3 px-5 whitespace-nowrap text-[13px]">
+                        {formatSubmittedAt(student.submitted_at)}
+                      </td>
+                      <td className="py-3 pr-3 font-mono text-[13px]">
                         {/^\d{10}$/.test(student.student_id)
                           ? student.student_id
                           : '-'}
@@ -217,7 +275,7 @@ export default function AdminStudentsPage() {
                     </tr>
                     {open && (
                       <tr className="bg-[#FDE8EC]/50">
-                        <td colSpan={9} className="px-5 py-4">
+                        <td colSpan={10} className="px-5 py-4">
                           <div className="grid gap-3 sm:grid-cols-2">
                             <DetailBlock
                               title="have (나의 매력)"
