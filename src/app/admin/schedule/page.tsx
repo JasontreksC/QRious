@@ -1,12 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
-import {
-  getAdminSchedule,
-  saveAdminSchedule,
-  ApiError,
-  type EventTimes,
-} from '@/lib/api';
+import { getAdminSchedule, ApiError, type EventTimes } from '@/lib/api';
 import {
   DEFAULT_EVENT_TIMES,
   EVENT_SCHEDULE,
@@ -68,24 +63,9 @@ export default function AdminSchedulePage() {
   const [form, setForm] = useState<FormState>(() =>
     timesToForm(DEFAULT_EVENT_TIMES)
   );
-  const [defaults, setDefaults] = useState<EventTimes>(DEFAULT_EVENT_TIMES);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [toastMessage, setToastMessage] = useState('');
-  const [showToast, setShowToast] = useState(false);
   const [linkRound2Open, setLinkRound2Open] = useState(true);
-
-  const triggerToast = (msg: string) => {
-    setToastMessage(msg);
-    setShowToast(true);
-  };
-
-  useEffect(() => {
-    if (!showToast) return;
-    const timer = setTimeout(() => setShowToast(false), 2800);
-    return () => clearTimeout(timer);
-  }, [showToast]);
 
   useEffect(() => {
     let cancelled = false;
@@ -96,7 +76,6 @@ export default function AdminSchedulePage() {
         const data = await getAdminSchedule();
         if (cancelled) return;
         setForm(timesToForm(data.times));
-        setDefaults(data.defaults);
         setLinkRound2Open(
           toHourlyKstInput(data.times.round1Announce) ===
             toHourlyKstInput(data.times.round2Open)
@@ -144,35 +123,8 @@ export default function AdminSchedulePage() {
     handleChange(id, joinFormValue(splitFormValue(form[id]).date, hour));
   };
 
-  const handleSave = async (e: React.FormEvent) => {
+  const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
-    const times = formToTimes(form);
-    if (!times) {
-      setError('날짜와 시각을 모두 올바르게 입력해 주세요.');
-      return;
-    }
-    setSaving(true);
-    setError('');
-    try {
-      const data = await saveAdminSchedule(times);
-      setForm(timesToForm(data.times));
-      setDefaults(data.defaults);
-      triggerToast('일정을 저장했어요.');
-    } catch (err) {
-      setError(
-        err instanceof ApiError ? err.message : '일정을 저장하지 못했습니다.'
-      );
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleResetDefaults = () => {
-    setForm(timesToForm(defaults));
-    setLinkRound2Open(
-      toHourlyKstInput(defaults.round1Announce) ===
-        toHourlyKstInput(defaults.round2Open)
-    );
   };
 
   return (
@@ -182,14 +134,14 @@ export default function AdminSchedulePage() {
           <div>
             <h2 className="text-lg font-bold">이벤트 일정</h2>
             <p className="text-xs text-[#8C7A8E] mt-1">
-              한국 시간(KST) · 시각은 정시 00:00–23:00 · 저장하면 홈·접수·결과에 바로 반영됩니다.
+              한국 시간(KST) · 행사 진행 중에는 일정을 바꿀 수 없습니다.
             </p>
           </div>
           <button
             type="button"
-            onClick={handleResetDefaults}
-            disabled={loading || saving}
-            className="px-3 py-2 rounded-xl text-xs font-bold border border-[#F0D9DF] text-[#8C7A8E] hover:bg-[#FDE8EC] disabled:opacity-50"
+            disabled
+            title="행사 진행 중에는 일정을 바꿀 수 없습니다."
+            className="px-3 py-2 rounded-xl text-xs font-bold border border-[#F0D9DF] text-[#8C7A8E] disabled:opacity-50 disabled:cursor-not-allowed"
           >
             코드 기본값 불러오기
           </button>
@@ -214,6 +166,7 @@ export default function AdminSchedulePage() {
               <input
                 type="checkbox"
                 checked={linkRound2Open}
+                disabled
                 onChange={(e) => {
                   const checked = e.target.checked;
                   setLinkRound2Open(checked);
@@ -232,7 +185,7 @@ export default function AdminSchedulePage() {
             <div className="grid gap-3">
               {EVENT_SCHEDULE.map((item) => {
                 const { date, hour } = splitFormValue(form[item.id]);
-                const disabled = item.id === 'round2Open' && linkRound2Open;
+                const disabled = true;
                 return (
                   <div
                     key={item.id}
@@ -284,22 +237,15 @@ export default function AdminSchedulePage() {
 
             <button
               type="submit"
-              disabled={saving}
-              className="w-full sm:w-auto min-h-[48px] px-5 py-3 rounded-xl bg-[#E8526A] text-white font-bold text-sm disabled:opacity-50"
+              disabled
+              title="행사 진행 중에는 일정을 바꿀 수 없습니다."
+              className="w-full sm:w-auto min-h-[48px] px-5 py-3 rounded-xl bg-[#E8526A] text-white font-bold text-sm disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {saving ? '저장 중…' : '일정 저장'}
+              일정 저장
             </button>
           </form>
         )}
       </section>
-
-      <div
-        className={`fixed bottom-6 left-1/2 -translate-x-1/2 bg-[#2B1B2E] text-white px-5 py-2.5 rounded-full text-sm font-medium z-[100] transition-all duration-300 pointer-events-none ${
-          showToast ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-3'
-        }`}
-      >
-        {toastMessage}
-      </div>
     </>
   );
 }

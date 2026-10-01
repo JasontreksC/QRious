@@ -2,7 +2,6 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  deleteAdminStudent,
   downloadAdminStudentsXlsx,
   getAdminStudents,
   ApiError,
@@ -19,7 +18,6 @@ export default function AdminStudentsPage() {
   const [pageSize, setPageSize] = useState<number>(10);
   const [page, setPage] = useState(1);
   const [query, setQuery] = useState('');
-  const [busyId, setBusyId] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
@@ -84,31 +82,6 @@ export default function AdminStudentsPage() {
     setPageSize(size);
     setPage(1);
     setExpandedId(null);
-  };
-
-  const handleDelete = async (student: AdminStudent) => {
-    if (
-      !window.confirm(
-        `${student.name} ${student.round}차 접수를 삭제할까요?`
-      )
-    ) {
-      return;
-    }
-    setBusyId(student.registration_id);
-    setError('');
-    try {
-      await deleteAdminStudent(student.registration_id);
-      setStudents((prev) =>
-        prev.filter((s) => s.registration_id !== student.registration_id)
-      );
-      if (expandedId === student.registration_id) setExpandedId(null);
-    } catch (err) {
-      setError(
-        err instanceof ApiError ? err.message : '삭제에 실패했습니다.'
-      );
-    } finally {
-      setBusyId(null);
-    }
   };
 
   const handleExport = async () => {
@@ -233,9 +206,9 @@ export default function AdminStudentsPage() {
                           </button>
                           <button
                             type="button"
-                            disabled={busyId === student.registration_id}
-                            onClick={() => handleDelete(student)}
-                            className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-[#F0D9DF] bg-white text-[#8C7A8E] hover:bg-[#FEF0F2] hover:text-[#E8526A] disabled:opacity-40"
+                            disabled
+                            title="행사 진행 중에는 삭제할 수 없습니다."
+                            className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-[#F0D9DF] bg-white text-[#8C7A8E] disabled:opacity-40 disabled:cursor-not-allowed"
                           >
                             삭제
                           </button>
