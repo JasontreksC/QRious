@@ -6,7 +6,7 @@ import {
   validateEventTimes,
 } from '@/lib/event-schedule';
 import { DEFAULT_EVENT_TIMES } from '@/lib/deadline';
-import { getSql } from '@/lib/db';
+import { getReadSql, getSql } from '@/lib/db';
 import { jsonError } from '@/lib/http';
 
 export const runtime = 'nodejs';
@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
   if (denied) return denied;
 
   try {
-    const sql = getSql();
+    const sql = getReadSql();
     const times = await loadEventTimes(sql);
     return NextResponse.json({
       times,

@@ -1,14 +1,14 @@
 import { NextResponse } from 'next/server';
 import { statsRound } from '@/lib/deadline';
 import { loadEventTimes } from '@/lib/event-schedule';
-import { getSql } from '@/lib/db';
+import { getReadSql } from '@/lib/db';
 import { jsonError } from '@/lib/http';
 
 export const runtime = 'nodejs';
 
 export async function GET() {
   try {
-    const sql = getSql();
+    const sql = getReadSql();
     const times = await loadEventTimes(sql);
     const round = statsRound(Date.now(), times);
     const rows = await sql`
@@ -53,11 +53,11 @@ export async function GET() {
   } catch (err) {
     console.error('GET /api/stats', err);
     const message =
-      err instanceof Error && err.message.includes('DATABASE_URL')
+      err instanceof Error && err.message.includes('AURORA_')
         ? err.message
         : '통계를 불러오지 못했습니다.';
     const code =
-      err instanceof Error && err.message.includes('DATABASE_URL')
+      err instanceof Error && err.message.includes('AURORA_')
         ? 'CONFIG_MISSING'
         : 'INTERNAL_ERROR';
     return jsonError(code === 'CONFIG_MISSING' ? 503 : 500, code, message);

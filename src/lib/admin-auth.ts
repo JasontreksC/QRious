@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSql } from '@/lib/db';
+import { getReadSql } from '@/lib/db';
 import { jsonError } from '@/lib/http';
 import { nameKey, phoneDigits } from '@/lib/phone';
 import { getSessionFromRequest, type AppSession } from '@/lib/session';
@@ -10,7 +10,7 @@ export async function identityIsAdmin(session: AppSession): Promise<boolean> {
   const birth = session.birth;
   if (!name || !phone || birth.length !== 6) return false;
   try {
-    const sql = getSql();
+    const sql = getReadSql();
     const rows = await sql`
       SELECT 1
       FROM admin

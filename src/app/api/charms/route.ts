@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
-import { getSql } from '@/lib/db';
+import { getReadSql } from '@/lib/db';
 import { jsonError } from '@/lib/http';
 
 export const runtime = 'nodejs';
 
 export async function GET() {
   try {
-    const sql = getSql();
+    const sql = getReadSql();
     const rows = await sql`
       SELECT charm_id::text AS charm_id, name
       FROM charm
@@ -22,11 +22,11 @@ export async function GET() {
   } catch (err) {
     console.error('GET /api/charms', err);
     const message =
-      err instanceof Error && err.message.includes('DATABASE_URL')
+      err instanceof Error && err.message.includes('AURORA_')
         ? err.message
         : '매력 목록을 불러오지 못했습니다.';
     const code =
-      err instanceof Error && err.message.includes('DATABASE_URL')
+      err instanceof Error && err.message.includes('AURORA_')
         ? 'CONFIG_MISSING'
         : 'INTERNAL_ERROR';
     return jsonError(code === 'CONFIG_MISSING' ? 503 : 500, code, message);

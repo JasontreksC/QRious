@@ -4,7 +4,7 @@ import { identityIsAdmin } from '@/lib/admin-auth';
 import { formatKstMonthDayTime, getRound2CtaState, isAwaitingAnnouncement } from '@/lib/deadline';
 import { loadEventTimes } from '@/lib/event-schedule';
 import { getSessionFromCookies } from '@/lib/session';
-import { getSql } from '@/lib/db';
+import { getReadSql } from '@/lib/db';
 import { loadMatchPartnerByIdentity } from '@/lib/match-result';
 import { studentHasRoundByIdentity } from '@/lib/own-survey';
 import { formatKrPhone } from '@/lib/phone';
@@ -16,7 +16,7 @@ export const metadata: Metadata = {
 };
 
 export default async function MatchResultPage() {
-  const sql = getSql();
+  const sql = getReadSql();
   const times = await loadEventTimes(sql);
 
   if (isAwaitingAnnouncement(Date.now(), times)) {
