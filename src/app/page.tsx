@@ -4,7 +4,7 @@ import { currentRegistrationRound, isAwaitingAnnouncement } from '@/lib/deadline
 import { loadEventTimes } from '@/lib/event-schedule';
 import { studentHasMatchByIdentity } from '@/lib/match-result';
 import { getSessionFromCookies } from '@/lib/session';
-import { getSql } from '@/lib/db';
+import { getReadSql } from '@/lib/db';
 import Home from './home-client';
 
 export default async function HomePage({
@@ -30,7 +30,7 @@ export default async function HomePage({
   if (session && !applyRound2) {
     let matched = false;
     try {
-      const sql = getSql();
+      const sql = getReadSql();
       matched = await studentHasMatchByIdentity(session, sql);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);

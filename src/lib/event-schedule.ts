@@ -6,7 +6,7 @@ import {
   type EventTimes,
 } from '@/lib/deadline';
 import type { Sql } from '@/lib/db';
-import { getSql } from '@/lib/db';
+import { getReadSql } from '@/lib/db';
 
 const EVENT_ORDER: EventId[] = [
   'round1Close',
@@ -87,7 +87,7 @@ export function validateEventTimes(
 
 export async function loadEventTimes(sql?: Sql): Promise<EventTimes> {
   try {
-    const client = sql ?? getSql();
+    const client = sql ?? getReadSql();
     const rows = await client`
       SELECT
         round1_close,

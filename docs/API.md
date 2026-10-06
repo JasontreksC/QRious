@@ -1,9 +1,9 @@
 # QRious Survey API Specification
 
-Next.js Route Handlers가 Neon Postgres에 직접 연결합니다.  
+Next.js Route Handlers가 AWS Aurora PostgreSQL에 직접 연결합니다.  
 별도 백엔드 서버는 없습니다. ERD: `student`, `registration`, `major`, `charm`, `have`, `want`, `ex_have`, `ex_want`, `age_pref`, `prefer_age`, `consent_notice`, `consent`, `admin`, `match_result`.
 
-브라우저는 같은 origin의 `/api/*`만 호출하고, 서버만 `DATABASE_URL`로 Neon에 접속합니다.
+브라우저는 같은 origin의 `/api/*`만 호출하고, 서버만 `AURORA_*` 환경 변수로 Aurora에 접속합니다.
 
 사전 접수(`POST /api/surveys`)는 연성대학교 Workspace 구글 계정(`@yeonsung.ac.kr`) 로그인 세션이 필요합니다.
 
@@ -14,14 +14,19 @@ Next.js Route Handlers가 Neon Postgres에 직접 연결합니다.
 서버 전용 (브라우저에 노출되지 않음):
 
 ```
-DATABASE_URL=postgresql://USER:PASSWORD@ep-xxx-pooler.region.aws.neon.tech/neondb?sslmode=require
+AURORA_WRITER_ENDPOINT=
+AURORA_READER_ENDPOINT=
+AURORA_DB_USER=
+AURORA_DB_PASSWORD=
+AURORA_DB_NAME=
+AURORA_DB_PORT=5432
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
 AUTH_SECRET=
 AUTH_URL=
 ```
 
-- Neon 콘솔의 **pooled** 연결 문자열을 사용합니다.
+- 쓰기와 방금 쓴 값을 바로 읽어야 하는 조회는 라이터 엔드포인트, 순수 조회는 리더 엔드포인트를 씁니다.
 - `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`은 Google Cloud OAuth 2.0 **웹 클라이언트**입니다.
 - 승인된 리디렉션 URI: `{origin}/api/auth/google/callback`  
   로컬 예: `http://localhost:3000/api/auth/google/callback`
@@ -56,7 +61,7 @@ AUTH_URL=
 | 403 | `NOT_STUDENT` | 구글 표시 이름이 `성함(학생)` 형식이 아님 |
 | 409 | `DUPLICATE_GOOGLE` | 동일 구글 계정으로 이미 접수 |
 | 500 | `INTERNAL_ERROR` | 서버/DB 오류 |
-| 503 | `CONFIG_MISSING` | `DATABASE_URL` 미설정 |
+| 503 | `CONFIG_MISSING` | `AURORA_*` 미설정 |
 
 OAuth 콜백이 실패하면 JSON 대신 홈으로 리다이렉트하며 `?error=`를 붙입니다.
 

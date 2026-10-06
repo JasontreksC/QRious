@@ -109,11 +109,11 @@ export async function GET(req: NextRequest) {
   } catch (err) {
     console.error('GET /api/surveys', err);
     const message =
-      err instanceof Error && err.message.includes('DATABASE_URL')
+      err instanceof Error && err.message.includes('AURORA_')
         ? err.message
         : '접수 정보를 불러오지 못했습니다.';
     const code =
-      err instanceof Error && err.message.includes('DATABASE_URL')
+      err instanceof Error && err.message.includes('AURORA_')
         ? 'CONFIG_MISSING'
         : 'INTERNAL_ERROR';
     return jsonError(code === 'CONFIG_MISSING' ? 503 : 500, code, message);
@@ -461,11 +461,11 @@ export async function POST(req: NextRequest) {
       );
     }
     const message =
-      err instanceof Error && err.message.includes('DATABASE_URL')
+      err instanceof Error && err.message.includes('AURORA_')
         ? err.message
         : '설문 제출에 실패했습니다.';
     const code =
-      err instanceof Error && err.message.includes('DATABASE_URL')
+      err instanceof Error && err.message.includes('AURORA_')
         ? 'CONFIG_MISSING'
         : 'INTERNAL_ERROR';
     return jsonError(code === 'CONFIG_MISSING' ? 503 : 500, code, message);
@@ -691,11 +691,11 @@ export async function PATCH(req: NextRequest) {
   } catch (err) {
     console.error('PATCH /api/surveys', err);
     const message =
-      err instanceof Error && err.message.includes('DATABASE_URL')
+      err instanceof Error && err.message.includes('AURORA_')
         ? err.message
         : '접수 정보를 수정하지 못했습니다.';
     const code =
-      err instanceof Error && err.message.includes('DATABASE_URL')
+      err instanceof Error && err.message.includes('AURORA_')
         ? 'CONFIG_MISSING'
         : 'INTERNAL_ERROR';
     return jsonError(code === 'CONFIG_MISSING' ? 503 : 500, code, message);

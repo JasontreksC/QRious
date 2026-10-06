@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/admin-auth';
 import { fetchJoinedStudents } from '@/lib/admin-students';
-import { getSql } from '@/lib/db';
+import { getReadSql } from '@/lib/db';
 import { jsonError } from '@/lib/http';
 
 export const runtime = 'nodejs';
@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
   if (denied) return denied;
 
   try {
-    const sql = getSql();
+    const sql = getReadSql();
     const students = await fetchJoinedStudents(sql);
     return NextResponse.json({ students });
   } catch (err) {

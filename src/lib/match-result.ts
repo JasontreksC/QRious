@@ -1,6 +1,6 @@
 import { birthToAge } from '@/lib/birth';
 import type { Sql } from '@/lib/db';
-import { getSql } from '@/lib/db';
+import { getReadSql } from '@/lib/db';
 import { eventTimeMs, type EventTimes } from '@/lib/deadline';
 import { loadEventTimes } from '@/lib/event-schedule';
 import type { StudentIdentity } from '@/lib/own-survey';
@@ -152,7 +152,7 @@ async function studentRoundsByIdentity(
 
 export async function studentHasMatchByIdentity(
   identity: StudentIdentity,
-  sql: Sql = getSql(),
+  sql: Sql = getReadSql(),
   now = Date.now()
 ): Promise<boolean> {
   const keys = identityKeys(identity);
@@ -186,7 +186,7 @@ export async function studentHasMatchByIdentity(
 /** 화면에 보여줄 매칭. 2차 접수가 있으면 2차 발표 전에는 숨기고, 이후에는 2차 매칭만 반환합니다. */
 export async function loadMatchPartnerByIdentity(
   identity: StudentIdentity,
-  sql: Sql = getSql(),
+  sql: Sql = getReadSql(),
   now = Date.now()
 ): Promise<MatchPartner | null> {
   const times = await loadEventTimes(sql);
