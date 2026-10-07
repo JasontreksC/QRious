@@ -855,6 +855,10 @@
   line-height: 1.75;
 }
 
+.matchingCopy + .matchingCopy {
+  margin-top: 12px;
+}
+
 .matchingLead {
   margin-bottom: 22px;
 }
@@ -888,6 +892,26 @@
   display: block;
   width: 100%;
   height: auto;
+}
+
+/* 가로로 긴 그림: 글씨가 읽히는 크기를 유지하고 좌우로 밀어서 본다 */
+.matchingFigureWide {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.matchingFigureWide img {
+  width: 860px;
+  max-width: none;
+}
+
+.matchingFigureHint {
+  position: sticky;
+  left: 0;
+  padding: 6px 10px 8px;
+  color: var(--y2k-muted);
+  font-size: 12px;
+  font-weight: 550;
 }
 
 .matchingNote {

@@ -85,34 +85,60 @@ export default function MatchingGuidePage() {
         <section className={styles.matchingSection}>
           <h2>3. 직접 적어 주신 이야기</h2>
           <p className={styles.matchingCopy}>
-            마지막으로 추가로 적어 주신 매력, 취미등이 서로 얼마나 잘 맞는지 평가해요. 
-            최신 AI 모델인 GPT 5.6 Luna가 직접 읽고 분석합니다.
+            마지막으로 추가로 적어 주신 매력, 취미 등이 서로 얼마나 잘 맞는지 평가해요.
+            최신 AI 모델인 GPT 6 Luna가 두 분이 적은 글을 직접 읽고 비교해요.
           </p>
-          <figure className={styles.matchingFigure}>
+          <figure className={`${styles.matchingFigure} ${styles.matchingFigureWide}`}>
             <Image
-              src="/images/ex_score_new.png"
-              alt="상대에게 바라는 이야기와 내가 적어 준 매력·취미·좋아하는 것을 AI가 비교해 점수로 만드는 그림"
-              width={1474}
-              height={1352}
-              sizes="(max-width: 480px) 92vw, 448px"
+              src="/images/ex_score_final.png"
+              alt="A가 원하는 이상형 글과 B가 가진 매력 글을 AI가 여덟 가지 기준으로 나눠 읽고, 기준마다 다섯 단계로 평가한 뒤, 세 번 채점한 중앙값을 총점 나누기 (기준 수 + 보정값)으로 점수화하는 그림"
+              width={2190}
+              height={1000}
+              sizes="860px"
             />
+            <figcaption className={styles.matchingFigureHint}>
+              그림이 작게 보이면 좌우로 밀어서 봐 주세요.
+            </figcaption>
           </figure>
           <p className={styles.matchingCopy}>
-            점수는 0점, 0.5점, 1점으로 셋 중 하나에요.
-            A가 원하는 것과 B가 가진 것, 두 문장을 두 단계에 걸쳐 파악해요.
+            <strong>1. 여덟 가지 기준으로 나눠 읽어요.</strong>
             <br />
-            1. 관련이 있는가?
+            A가 적은 이상형 글과 B가 적은 매력 글을 AI가 먼저 정리해요.
+            인상, 외모, 성격/가치관, 분위기/스타일, 취미/관심사, 연애관, 생활습관,
+            그리고 군필·직업 같은 배경이 그 기준이에요.
+            한 글에 여러 이야기가 섞여 있어도 괜찮아요.
+            구절마다 알맞은 기준으로 나눠 담아요.
+          </p>
+          <p className={styles.matchingCopy}>
+            <strong>2. 기준마다 다섯 단계로 평가해요.</strong>
             <br />
-            → 없으면 0점, 있으면 다음 단계로 넘어가요.
+            A가 바란 기준마다, B가 같은 기준에 적은 내용이 얼마나 맞는지 봐요.
             <br />
-            2. 얼마나 비슷한가?
+            동일 1점 · 거의 일치 0.75점 · 부분 일치 0.5점 · 약한 관련 0.25점 · 무관하거나 충돌 0점
             <br />
-            → 반대면 0점, 비슷하면 0.5점, 같으면 1점이에요.
+            B가 그 기준에 아무것도 적지 않았다면 맞는지 알 수 없으니 0점이에요.
+          </p>
+          <p className={styles.matchingCopy}>
+            <strong>3. 세 번 채점해서 가운데 값을 써요.</strong>
+            <br />
+            AI도 가끔 엉뚱한 점수를 낼 수 있어요.
+            그래서 같은 내용을 따로따로 세 번 채점하고, 그 가운데 값(중앙값)을 점수로 써요.
+            세 번의 점수가 크게 엇갈리면 두 번 더 채점해요.
+          </p>
+          <p className={styles.matchingCopy}>
+            <strong>4. 기준 수로 나눠서 총점을 내요.</strong>
+            <br />
+            기준별 점수를 모두 더한 뒤, (A가 바란 기준 수 + 보정값)으로 나눠요.
+            기준을 하나만 적었는데 우연히 딱 맞았다고 만점이 되지 않도록,
+            분모에 작은 보정값을 더해 둔 거예요.
+            그래서 여러 기준에서 고르게 맞을수록 점수가 높아져요.
           </p>
           <p className={styles.matchingNote}>
             이번에도 A→B와 B→A를 각각 점수를 내지만, 태그 점수와 달리 조화평균이 아닌 산술평균으로 합쳐요.
             자유 텍스트 입력은 태그보다 훨씬 다양한 주제를 다룰 수 있기 때문에, 태그보다 점수가 나올 확률이 낮아요.
             그래서 한 방향이라도 맞는 부분이 있으면 그것을 살리기로 했어요.
+            한쪽만 이야기를 적었다면 그 방향 점수의 절반만 반영하고,
+            두 분 다 적지 않았다면 이 점수는 빼고 MBTI와 태그로만 계산해요.
           </p>
         </section>
 
