@@ -807,7 +807,7 @@ export default function Home({
           태그로 고르는<br />매력 ・ 이상형
         </span>
         <span className={`${styles.sticker} ${styles.titleSticker2}`}>
-          GPT 5.6<br />AI 매칭 시스템
+          GPT 6<br />AI 매칭 시스템
         </span>
         <span className={styles.chromeStar}>✦</span>
       </div>
