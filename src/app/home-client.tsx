@@ -96,8 +96,12 @@ function isValidKrPhone(value: string): boolean {
 
 function NamePhoneLogin({
   onLoggedIn,
+  submitLabel = '접수하러 가기',
+  submittingLabel = '접수하러 가는 중…',
 }: {
   onLoggedIn: () => Promise<void>;
+  submitLabel?: string;
+  submittingLabel?: string;
 }) {
   const [name, setName] = useState('');
   const [studentNumber, setStudentNumber] = useState('');
@@ -232,7 +236,7 @@ function NamePhoneLogin({
         disabled={submitting}
         className="w-full inline-flex items-center justify-center min-h-[52px] px-5 py-3.5 bg-white border border-[#F0D9DF] hover:bg-[#FDE8EC] text-[#2B1B2E] text-[16px] font-semibold rounded-xl transition-colors duration-200 disabled:opacity-50"
       >
-        {submitting ? '접수하러 가는 중…' : '접수하러 가기'}
+        {submitting ? submittingLabel : submitLabel}
       </button>
     </form>
   );
@@ -913,6 +917,14 @@ export default function Home({
             ) : null}
             {showLogin ? (
               <NamePhoneLogin
+                submitLabel={
+                  round1ResultAndRound2Open
+                    ? '결과 확인 & 2차 접수'
+                    : undefined
+                }
+                submittingLabel={
+                  round1ResultAndRound2Open ? '확인하는 중…' : undefined
+                }
                 onLoggedIn={async () => {
                   setAuthLoading(true);
                   let holdForResult = false;
